@@ -29,11 +29,13 @@ Running it again is safe and fast: extensions that are already set are skipped.
 | File | Purpose |
 |---|---|
 | `SetDefaultApps.exe` | The finished tool (if you have built it) |
+| `UserChoiceLatest.exe` | Helper that computes and applies modern Windows 11 `UserChoiceLatest` hashes |
 | `apps.ini` | **The only file you normally edit**: which app gets which file types |
 | `build.bat` | Builds `SetDefaultApps.exe` from the files below |
 | `run.ps1` | The logic: reads `apps.ini` and sets the defaults |
 | `SFTA.ps1` | [PS-SFTA](https://github.com/DanysysTeam/PS-SFTA) by Danysys (MIT licence), does the actual default-app change |
 | `SetDefaultApps.cs` | Tiny launcher that runs `run.ps1` from inside the exe |
+| `src/` | Source code for `UserChoiceLatest.exe` (C++) |
 | `*.ico` | *(optional)* your own icon for the exe |
 
 ---
@@ -79,11 +81,11 @@ Get-FTA .docx
 
 Needs only Windows (it uses the C# compiler that ships with .NET Framework 4.x).
 
-1. Put `build.bat`, `run.ps1`, `apps.ini`, `SetDefaultApps.cs` and (optionally) `SFTA.ps1` in one folder. If `SFTA.ps1` is missing, `build.bat` downloads it.
+1. Put `build.bat`, `run.ps1`, `apps.ini`, `SetDefaultApps.cs`, `UserChoiceLatest.exe`, and (optionally) `SFTA.ps1` in one folder. If `SFTA.ps1` is missing, `build.bat` downloads it.
 2. *(Optional)* Drop an `.ico` file in the same folder to give the exe your icon.
 3. Double-click `build.bat`.
 
-You get `SetDefaultApps.exe` with `apps.ini`, `run.ps1` and `SFTA.ps1` embedded inside it. Rebuild whenever you change `apps.ini` and want the change built in. If Explorer keeps showing the old icon, rename the exe or restart `explorer.exe`.
+You get `SetDefaultApps.exe` with `apps.ini`, `run.ps1`, `SFTA.ps1`, and `UserChoiceLatest.exe` embedded inside it. Rebuild whenever you change `apps.ini` and want the change built in. If Explorer keeps showing the old icon, rename the exe or restart `explorer.exe`.
 
 ---
 
@@ -92,7 +94,7 @@ You get `SetDefaultApps.exe` with `apps.ini`, `run.ps1` and `SFTA.ps1` embedded 
 1. Reads `apps.ini`.
 2. For each enabled app, finds the exe. Not installed means the app is skipped.
 3. Creates a ProgID for the app under `HKCU\Software\Classes` (current user only), unless the app or `apps.ini` already names one.
-4. For every extension, checks the current default with `Get-FTA`. If it is already the right one, it skips it. Otherwise it calls `Set-FTA` (PS-SFTA), which writes the Windows UserChoice entry correctly.
+4. For every extension, checks the current default with `Get-FTA`. If it is already the right one, it skips it. Otherwise it calls `Set-FTA`, which sets both the legacy Windows `UserChoice` registry entry and the modern Windows 11 `UserChoiceLatest` entry with a valid hash.
 5. Refreshes the icon cache.
 
 ---
@@ -116,8 +118,9 @@ You get `SetDefaultApps.exe` with `apps.ini`, `run.ps1` and `SFTA.ps1` embedded 
 
 - Changes only affect the current Windows user.
 - The Word/Excel/PowerPoint/Acrobat blocks are examples and have not been verified.
-- Uses an unofficial method (PS-SFTA) to set defaults, because Windows 10/11 block the official one for scripts. A future Windows update could break it.
+- Supports both legacy Windows (Windows 10 / earlier Windows 11 using `UserChoice`) and modern Windows 11 (23H2 / 24H2 using `UserChoiceLatest`).
 
 ## Credits
 
-Default-app logic: [PS-SFTA](https://github.com/DanysysTeam/PS-SFTA) by Danyfirex and Dany3j, MIT licence.
+- Default-app logic: [PS-SFTA](https://github.com/DanysysTeam/PS-SFTA) by Danyfirex and Dany3j, MIT licence.
+- Windows 11 `UserChoiceLatest` hash algorithm: [UserChoiceLatestHash](https://github.com/cssxn/UserChoiceLatestHash) by cssxn, MIT licence.

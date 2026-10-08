@@ -52,11 +52,15 @@ function Get-FTA {
     $Extension
   )
 
-  
   if ($Extension) {
     Write-Verbose "Get File Type Association for $Extension"
-    
-    $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoice" -ErrorAction SilentlyContinue).ProgId
+    $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoiceLatest\ProgId" -ErrorAction SilentlyContinue).ProgId
+    if (-not $assocFile) {
+      $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoiceLatest" -ErrorAction SilentlyContinue).ProgId
+    }
+    if (-not $assocFile) {
+      $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoice" -ErrorAction SilentlyContinue).ProgId
+    }
     Write-Output $assocFile
   }
   else {
@@ -64,7 +68,14 @@ function Get-FTA {
 
     $assocList = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\* |
     ForEach-Object {
-      $progId = (Get-ItemProperty "$($_.PSParentPath)\$($_.PSChildName)\UserChoice" -ErrorAction SilentlyContinue).ProgId
+      $p = $_.PSPath
+      $progId = (Get-ItemProperty "$p\UserChoiceLatest\ProgId" -ErrorAction SilentlyContinue).ProgId
+      if (-not $progId) {
+        $progId = (Get-ItemProperty "$p\UserChoiceLatest" -ErrorAction SilentlyContinue).ProgId
+      }
+      if (-not $progId) {
+        $progId = (Get-ItemProperty "$p\UserChoice" -ErrorAction SilentlyContinue).ProgId
+      }
       if ($progId) {
         "$($_.PSChildName), $progId"
       }
@@ -85,7 +96,13 @@ function Get-PTA {
   if ($Protocol) {
     Write-Verbose "Get Protocol Type Association for $Protocol"
 
-    $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$Protocol\UserChoice" -ErrorAction SilentlyContinue).ProgId
+    $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$Protocol\UserChoiceLatest\ProgId" -ErrorAction SilentlyContinue).ProgId
+    if (-not $assocFile) {
+      $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$Protocol\UserChoiceLatest" -ErrorAction SilentlyContinue).ProgId
+    }
+    if (-not $assocFile) {
+      $assocFile = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\$Protocol\UserChoice" -ErrorAction SilentlyContinue).ProgId
+    }
     Write-Output $assocFile
   }
   else {
@@ -93,7 +110,14 @@ function Get-PTA {
 
     $assocList = Get-ChildItem HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\* |
     ForEach-Object {
-      $progId = (Get-ItemProperty "$($_.PSParentPath)\$($_.PSChildName)\UserChoice" -ErrorAction SilentlyContinue).ProgId
+      $p = $_.PSPath
+      $progId = (Get-ItemProperty "$p\UserChoiceLatest\ProgId" -ErrorAction SilentlyContinue).ProgId
+      if (-not $progId) {
+        $progId = (Get-ItemProperty "$p\UserChoiceLatest" -ErrorAction SilentlyContinue).ProgId
+      }
+      if (-not $progId) {
+        $progId = (Get-ItemProperty "$p\UserChoice" -ErrorAction SilentlyContinue).ProgId
+      }
       if ($progId) {
         "$($_.PSChildName), $progId"
       }
@@ -237,6 +261,11 @@ function Remove-FTA {
   }
 
   try {
+    $keyPath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoiceLatest\ProgId"
+    Remove-UserChoiceKey $keyPath
+    $keyPath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoiceLatest"
+    Remove-UserChoiceKey $keyPath
+
     $keyPath = "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Extension\UserChoice"
     Write-Verbose "Remove User UserChoice Key If Exist: $keyPath"
     Remove-UserChoiceKey $keyPath
@@ -511,23 +540,33 @@ function Set-FTA {
   
   function local:Get-UserExperience {
     [OutputType([string])]
+    param ()
+    if ($script:CachedUserExperience) {
+      return $script:CachedUserExperience
+    }
     $hardcodedExperience = "User Choice set via Windows User Experience {D18B6DD5-6124-4341-9318-804003BAFA0B}"
     $userExperienceSearch = "User Choice set via Windows User Experience"
     $userExperienceString = ""
     $user32Path = [Environment]::GetFolderPath([Environment+SpecialFolder]::SystemX86) + "\Shell32.dll"
-    $fileStream = [System.IO.File]::Open($user32Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
-    $binaryReader = New-Object System.IO.BinaryReader($fileStream)
-    [Byte[]] $bytesData = $binaryReader.ReadBytes(5mb)
-    $fileStream.Close()
-    $dataString = [Text.Encoding]::Unicode.GetString($bytesData)
-    $position1 = $dataString.IndexOf($userExperienceSearch)
-    $position2 = $dataString.IndexOf("}", $position1)
-    try {
-      $userExperienceString = $dataString.Substring($position1, $position2 - $position1 + 1)
+    if (Test-Path -LiteralPath $user32Path) {
+      try {
+        $fileStream = [System.IO.File]::Open($user32Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $binaryReader = New-Object System.IO.BinaryReader($fileStream)
+        [Byte[]] $bytesData = $binaryReader.ReadBytes(5mb)
+        $fileStream.Close()
+        $dataString = [Text.Encoding]::Unicode.GetString($bytesData)
+        $position1 = $dataString.IndexOf($userExperienceSearch)
+        $position2 = $dataString.IndexOf("}", $position1)
+        if ($position1 -ge 0 -and $position2 -ge $position1) {
+          $userExperienceString = $dataString.Substring($position1, $position2 - $position1 + 1)
+        }
+      }
+      catch {}
     }
-    catch {
+    if (-not $userExperienceString) {
       $userExperienceString = $hardcodedExperience
     }
+    $script:CachedUserExperience = $userExperienceString
     Write-Output $userExperienceString
   }
   
@@ -738,6 +777,16 @@ function Set-FTA {
   else {
     Write-Verbose "Write Registry Protocol: $Extension"
     Write-ProtocolKeys $ProgId $Extension $progHash
+  }
+
+  # Also apply modern UserChoiceLatest if helper executable is present (required on Windows 11)
+  $helper = Join-Path $PSScriptRoot 'UserChoiceLatest.exe'
+  if (-not (Test-Path -LiteralPath $helper)) {
+    $helper = Join-Path (Get-Location) 'UserChoiceLatest.exe'
+  }
+  if (Test-Path -LiteralPath $helper) {
+    Write-Verbose "Applying UserChoiceLatest via $helper"
+    & $helper -set $Extension $ProgId | Out-Null
   }
 
    

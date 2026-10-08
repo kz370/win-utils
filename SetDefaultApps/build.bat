@@ -15,6 +15,7 @@ set "MISSING="
 if not exist "SetDefaultApps.cs" set "MISSING=SetDefaultApps.cs"
 if not exist "run.ps1" set "MISSING=run.ps1"
 if not exist "apps.ini" set "MISSING=apps.ini"
+if not exist "UserChoiceLatest.exe" set "MISSING=UserChoiceLatest.exe"
 if defined MISSING goto :missing
 
 rem ===== Get PS-SFTA if it is not here yet =====
@@ -33,12 +34,12 @@ if exist "%OUT%" del /q "%OUT%" >nul 2>&1
 if defined ICON goto :build_icon
 
 echo No .ico file found next to build.bat - building without a custom icon.
-"%CSC%" /nologo /target:exe /platform:x64 /optimize+ /out:"%OUT%" /resource:SFTA.ps1,SFTA.ps1 /resource:run.ps1,run.ps1 /resource:apps.ini,apps.ini SetDefaultApps.cs
+"%CSC%" /nologo /target:exe /platform:x64 /optimize+ /out:"%OUT%" /resource:UserChoiceLatest.exe,UserChoiceLatest.exe /resource:SFTA.ps1,SFTA.ps1 /resource:run.ps1,run.ps1 /resource:apps.ini,apps.ini SetDefaultApps.cs
 goto :built
 
 :build_icon
 echo Using icon: %ICON%
-"%CSC%" /nologo /target:exe /platform:x64 /optimize+ /win32icon:"%ICON%" /out:"%OUT%" /resource:SFTA.ps1,SFTA.ps1 /resource:run.ps1,run.ps1 /resource:apps.ini,apps.ini SetDefaultApps.cs
+"%CSC%" /nologo /target:exe /platform:x64 /optimize+ /win32icon:"%ICON%" /out:"%OUT%" /resource:UserChoiceLatest.exe,UserChoiceLatest.exe /resource:SFTA.ps1,SFTA.ps1 /resource:run.ps1,run.ps1 /resource:apps.ini,apps.ini SetDefaultApps.cs
 
 :built
 if errorlevel 1 goto :build_failed

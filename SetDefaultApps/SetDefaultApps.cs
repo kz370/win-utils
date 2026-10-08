@@ -8,15 +8,21 @@ class SetDefaultApps
     static void Extract(string name, string dir)
     {
         using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
-        using (MemoryStream ms = new MemoryStream())
         {
-            s.CopyTo(ms);
-            byte[] data = ms.ToArray();
-            bool hasBom = data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF;
-            using (FileStream f = File.Create(Path.Combine(dir, name)))
+            if (s == null) return;
+            using (MemoryStream ms = new MemoryStream())
             {
-                if (!hasBom) f.Write(new byte[] { 0xEF, 0xBB, 0xBF }, 0, 3); // PowerShell 5.1 needs a BOM for UTF-8
-                f.Write(data, 0, data.Length);
+                s.CopyTo(ms);
+                byte[] data = ms.ToArray();
+                using (FileStream f = File.Create(Path.Combine(dir, name)))
+                {
+                    if (name.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".ini", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool hasBom = data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF;
+                        if (!hasBom) f.Write(new byte[] { 0xEF, 0xBB, 0xBF }, 0, 3); // PowerShell 5.1 needs a BOM for UTF-8
+                    }
+                    f.Write(data, 0, data.Length);
+                }
             }
         }
     }
@@ -29,6 +35,7 @@ class SetDefaultApps
         try
         {
             Directory.CreateDirectory(dir);
+            Extract("UserChoiceLatest.exe", dir);
             Extract("SFTA.ps1", dir);
             Extract("run.ps1", dir);
             Extract("apps.ini", dir);
