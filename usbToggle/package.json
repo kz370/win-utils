@@ -1,0 +1,9 @@
+{
+  "name": "usbToggle",
+  "version": "1.0.0",
+  "description": "USB device toggle tray utility (Tauri)",
+  "scripts": {
+    "dev": "echo done",
+    "build": "echo done"
+  }
+}
