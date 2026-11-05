@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>USB Toggle</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="icons.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" data-icon="usb"></span>
+          <div>
+            <h1>USB Toggle</h1>
+            <p id="summary" class="summary">Looking for devices…</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="refresh" class="icon-btn" type="button" title="Refresh (F5)" aria-label="Refresh devices">
+            <span data-icon="refresh"></span>
+          </button>
+          <button id="open-settings" class="icon-btn" type="button" title="Settings" aria-label="Settings">
+            <span data-icon="settings"></span>
+          </button>
+        </div>
+      </header>
+
+      <div id="banner" class="banner" hidden>
+        <span class="banner-icon" data-icon="shield"></span>
+        <div class="banner-text">
+          <strong>Administrator rights needed</strong>
+          <span>You can browse devices, but Windows only lets an administrator turn them on or off.</span>
+        </div>
+        <button id="elevate" class="btn btn-primary" type="button">Restart as admin</button>
+      </div>
+
+      <div id="notice" class="notice" hidden></div>
+
+      <div class="toolbar">
+        <label class="search">
+          <span data-icon="search"></span>
+          <input id="search" type="search" placeholder="Search devices" autocomplete="off" spellcheck="false" aria-label="Search devices" />
+          <kbd class="search-hint">Ctrl F</kbd>
+        </label>
+        <div class="segmented" role="radiogroup" aria-label="Filter" id="filter">
+          <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
+          <button type="button" role="radio" data-filter="on" aria-checked="false">On</button>
+          <button type="button" role="radio" data-filter="off" aria-checked="false">Off</button>
+        </div>
+      </div>
+
+      <main id="list" class="list" aria-live="polite"></main>
+    </div>
+
+    <div id="toasts" class="toasts" aria-live="assertive"></div>
+
+    <dialog id="confirm" class="dialog">
+      <form method="dialog" class="dialog-body">
+        <div class="dialog-head">
+          <span class="dialog-icon warn" data-icon="alert"></span>
+          <h2 id="confirm-title">Turn off this device?</h2>
+        </div>
+        <p id="confirm-text"></p>
+        <label class="check">
+          <input type="checkbox" id="confirm-dont-ask" />
+          <span>Don't ask again</span>
+        </label>
+        <div class="dialog-actions">
+          <button value="cancel" class="btn" type="submit">Cancel</button>
+          <button value="ok" class="btn btn-danger" type="submit" id="confirm-ok">Turn off</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settings" class="dialog dialog-wide">
+      <div class="dialog-body">
+        <div class="dialog-head">
+          <h2>Settings</h2>
+          <button class="icon-btn" type="button" data-close aria-label="Close settings"><span data-icon="x"></span></button>
+        </div>
+
+        <section class="settings-group">
+          <h3>Appearance</h3>
+          <div class="setting">
+            <div><span class="setting-title">Theme</span></div>
+            <div class="segmented" role="radiogroup" aria-label="Theme" id="theme">
+              <button type="button" role="radio" data-theme-value="system">System</button>
+              <button type="button" role="radio" data-theme-value="light">Light</button>
+              <button type="button" role="radio" data-theme-value="dark">Dark</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <h3>Devices</h3>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Show disconnected devices</span>
+              <span class="setting-desc">Devices Windows remembers. You can turn them off before plugging them in.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="showDisconnected" aria-label="Show disconnected devices"><span class="knob"></span></button>
+          </div>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Show USB hubs</span>
+              <span class="setting-desc">Turning off a hub turns off everything plugged into it.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="showHubs" aria-label="Show USB hubs"><span class="knob"></span></button>
+          </div>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Confirm risky changes</span>
+              <span class="setting-desc">Ask before turning off keyboards, mice, hubs and Bluetooth adapters.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="confirmRisky" aria-label="Confirm risky changes"><span class="knob"></span></button>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <h3>Window and startup</h3>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Keep running in the tray</span>
+              <span class="setting-desc">Closing the window hides it. Quit from the tray icon menu.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="closeToTray" aria-label="Keep running in the tray"><span class="knob"></span></button>
+          </div>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Start with Windows</span>
+              <span class="setting-desc" id="autostart-desc"></span>
+            </div>
+            <button class="switch" role="switch" id="autostart" aria-label="Start with Windows"><span class="knob"></span></button>
+          </div>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Start in the tray</span>
+              <span class="setting-desc">When started with Windows, don't open the window.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="startMinimized" aria-label="Start in the tray"><span class="knob"></span></button>
+          </div>
+        </section>
+
+        <section class="settings-group">
+          <h3>About</h3>
+          <p class="about">
+            <strong>USB Toggle <span id="version"></span></strong><br />
+            Turning a device off unloads its driver, like Device Manager does. The USB port can stay powered, so
+            chargers and lights may keep working. The change lasts until you turn the device back on, even after
+            unplugging or restarting.
+          </p>
+          <div class="about-actions">
+            <button class="btn" type="button" data-open-folder="config">Settings folder</button>
+            <button class="btn" type="button" data-open-folder="logs">Logs</button>
+            <button class="btn btn-quiet" type="button" id="quit">Quit USB Toggle</button>
+          </div>
+        </section>
+      </div>
+    </dialog>
+  </body>
+</html>

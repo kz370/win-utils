@@ -52,4 +52,4 @@ playwright-report/
 test-results/
 
 # Tauri build artifacts
-src-tauri/target/
+src-tauri/target/package-lock.json

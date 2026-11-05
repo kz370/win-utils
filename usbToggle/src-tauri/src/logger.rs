@@ -1,65 +1,42 @@
+//! Tiny file logger: %LOCALAPPDATA%\usbToggle\logs\usbToggle.log, rotated at 1 MB.
+
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
-const MAX_SIZE: u64 = 5 * 1024 * 1024;
-const MAX_FILES: usize = 5;
+const MAX_SIZE: u64 = 1024 * 1024;
 
 pub struct Logger {
-    inner: Mutex<Option<LoggerInner>>,
+    path: Mutex<Option<PathBuf>>,
 }
 
-struct LoggerInner {
-    path: PathBuf,
+pub static LOGGER: Logger = Logger { path: Mutex::new(None) };
+
+pub fn log_dir() -> PathBuf {
+    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    base.join("usbToggle").join("logs")
 }
 
 impl Logger {
-    pub fn new() -> Self {
-        Self { inner: Mutex::new(None) }
-    }
-
     pub fn init(&self) {
-        let local_appdata = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| std::env::temp_dir().to_string_lossy().to_string());
-        let dir = PathBuf::from(local_appdata).join("usbToggle").join("logs");
-        let _ = fs::create_dir_all(&dir);
-        let path = dir.join("usbToggle.log");
-        let _ = Self::rotate_dir(&dir);
-        *self.inner.lock().unwrap() = Some(LoggerInner { path });
+        let dir = log_dir();
+        if fs::create_dir_all(&dir).is_ok() {
+            if let Ok(mut p) = self.path.lock() {
+                *p = Some(dir.join("usbToggle.log"));
+            }
+        }
     }
 
     pub fn log(&self, level: &str, message: &str) {
-        let path = {
-            let guard = self.inner.lock().unwrap();
-            let Some(inner) = guard.as_ref() else { return };
-            inner.path.clone()
-        };
-
-        let ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let line = format!("[{ts}] [{level}] {message}\n");
-
-        if let Ok(metadata) = fs::metadata(&path) {
-            if metadata.len() > MAX_SIZE {
-                let _ = Self::rotate_dir(path.parent().unwrap());
-            }
+        let Ok(guard) = self.path.lock() else { return };
+        let Some(path) = guard.as_ref() else { return };
+        if fs::metadata(path).map(|m| m.len() > MAX_SIZE).unwrap_or(false) {
+            let _ = fs::rename(path, path.with_extension("old.log"));
         }
-
-        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
-            let _ = file.write_all(line.as_bytes());
-        }
-    }
-
-    fn rotate_dir(dir: &Path) {
-        let mut files: Vec<PathBuf> = match fs::read_dir(dir) {
-            Ok(rd) => rd.filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().map(|e| e == "log").unwrap_or(false)).collect(),
-            Err(_) => Vec::new(),
-        };
-        files.sort_by_key(|p| p.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH));
-        while files.len() > MAX_FILES {
-            if let Some(oldest) = files.first() {
-                let _ = fs::remove_file(oldest);
-                files.remove(0);
-            }
+        if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(path) {
+            let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+            let _ = writeln!(f, "[{ts}] [{level}] {message}");
         }
     }
 }
@@ -73,5 +50,3 @@ macro_rules! log_info {
 macro_rules! log_error {
     ($($arg:tt)*) => { $crate::logger::LOGGER.log("ERROR", &format!($($arg)*)) };
 }
-
-pub static LOGGER: Logger = Logger { inner: Mutex::new(None) };
