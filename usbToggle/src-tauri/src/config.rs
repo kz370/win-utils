@@ -28,7 +28,8 @@ pub struct Settings {
     /// Hide connected devices Windows reports a problem with (code 43, no
     /// driver, ...). Disabled devices are not "problems".
     pub hide_problems: bool,
-    /// Keyboards and mice can't be turned off unless unlocked one by one.
+    /// "Protect devices": keyboards and mice are protected automatically, and
+    /// while this is on no protected device can be unprotected.
     pub protect_input: bool,
 }
 
@@ -55,14 +56,24 @@ pub struct DeviceSettings {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub pinned: bool,
-    /// The user's own lock choice. `None` follows the automatic rule
-    /// (`Settings::protect_input`); `Some` overrides it either way.
+    /// The user chose to protect this device (`Some(true)`). `None` (and the
+    /// old `Some(false)`) mean no choice: only the automatic rule applies.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locked: Option<bool>,
     /// Icon chosen by the user (an icon name from ui/icons.js). `None` uses
     /// the icon of the detected device type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+}
+
+/// A device is protected by the automatic rule or by the user's own choice.
+pub fn is_locked(auto_rule: bool, explicit: Option<bool>) -> bool {
+    auto_rule || explicit == Some(true)
+}
+
+/// Protection can only be removed while "Protect devices" is off.
+pub fn may_unprotect(protect_setting: bool) -> bool {
+    !protect_setting
 }
 
 impl DeviceSettings {
@@ -209,6 +220,19 @@ mod tests {
         store.save(&cfg).unwrap();
         assert!(store.load().0.settings.show_hubs);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn protection_rules() {
+        // automatic rule or the user's choice protects; an old "false" does not unprotect
+        assert!(is_locked(true, None));
+        assert!(is_locked(true, Some(false)), "old unlock choices no longer override the rule");
+        assert!(is_locked(false, Some(true)));
+        assert!(!is_locked(false, None));
+        assert!(!is_locked(false, Some(false)));
+        // unprotecting is only possible with the setting off
+        assert!(!may_unprotect(true));
+        assert!(may_unprotect(false));
     }
 
     #[test]

@@ -76,6 +76,8 @@ main                        (main.rs)       - Calls usb_toggle_lib::run().
 run                         (lib.rs)        - Starts the app: logger, config, elevation, Tauri builder, setup, event loop.
 core                        (lib.rs)        - Returns the shared Core from an AppHandle.
 auto_lock                   (lib.rs)        - Automatic protection rule (keyboards and mice when protectInput is on).
+is_locked                   (config.rs)     - Protected = automatic rule or the user's own protection.
+may_unprotect               (config.rs)     - Protection can only be removed while "Protect devices" is off.
 apply_config                (lib.rs)        - Applies custom names, pins, protection and icons, then sorts devices.
 snapshot                    (lib.rs)        - Builds a Snapshot from Core.
 refresh                     (lib.rs)        - Rescans devices, stores the result, publishes it.
@@ -222,7 +224,8 @@ saveSettings                - Immediate settings save with rollback (outside the
 refresh                     - Forced rescan with spinner.
 setEnabled                  - Switch flow: confirmation, pending, invoke, toasts, Undo.
 setPinned, rename           - Pin and rename actions.
-setLocked                   - Protect / unprotect action with a confirmation toast.
+setLocked                   - Protect / unprotect action; unprotecting is refused while "Protect devices" is on, else asks first.
+askConfirm                  - Reusable warning dialog (title, text, button label, optional "Don't ask again").
 setIcon                     - Sets or clears a device's custom icon.
 restartAsAdmin              - Invokes restart_as_admin.
 copy                        - Copies text to the clipboard.
@@ -233,7 +236,7 @@ metaParts                   - Secondary line of a row (status, type, vendor, pan
 createRow, updateRow        - Create and update a device row in place.
 fact                        - One label/value pair in the details list.
 renderDetails               - Details panel (rename, icon picker, problem note, facts).
-protectionText              - "Protected automatically / by you / Not protected (you unprotected it)".
+protectionText              - "Protected automatically" / "Protected by you".
 connectionText              - "USB port 3 on this PC (front panel)" style text.
 toggleExpanded              - Opens/closes a row's details.
 getSection                  - Creates or returns a list section.

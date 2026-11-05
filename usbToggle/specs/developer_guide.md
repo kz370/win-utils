@@ -144,10 +144,10 @@ do not depend on Tauri or Win32).
 
 - Plug in and remove a device: the list updates within about a second.
 - Turn a device off and on, from the window and from the tray (after pinning it).
-- Keyboards and mice are in "Protected" with a greyed switch; clicking it explains how to unprotect.
-  Unprotect one with its lock button: it moves to its port section and can be turned off (with the
-  confirmation; *Don't ask again* disables it). Protect another device and check the tray item shows
-  "(protected)".
+- Keyboards and mice are in "Protected" with a greyed switch and a greyed lock; clicking either explains why.
+  Protect another device with its lock: it moves to "Protected", the tray item shows "(protected)", and its
+  lock is greyed too. Turn off *Protect devices* in Settings: a warning dialog appears; after confirming and
+  saving, locks work again and unprotecting a device asks for confirmation.
 - A Wi-Fi + Bluetooth combo card's Bluetooth half is listed as a Bluetooth adapter (built-in), not as
   audio, and not named after the Wi-Fi card.
 - Run without admin rights: banner, `accessDenied` toast with *Restart as admin*, relaunch works.

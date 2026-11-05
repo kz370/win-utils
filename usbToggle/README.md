@@ -122,8 +122,11 @@ sit in a **Protected** section with a small padlock next to the name. Clicking t
 why nothing happened.
 
 - **Protect any device:** hover a row and click the **lock** button (or open the row and use it).
-- **Unprotect a device:** click its lock again. It moves back to its normal section.
-- **Turn the automatic rule off** with *Protect keyboards and mice* in Settings.
+- **Unprotecting is deliberately hard.** While **Protect devices** is on in Settings, a protected device
+  **can't be unprotected**: its lock is greyed out. You can protect more devices, but not remove protection.
+- **To unprotect devices,** turn off **Protect devices** in Settings. You are asked to confirm, with a
+  warning. After that, the lock on each device works again, and unprotecting a device asks for another
+  confirmation.
 
 Protection only blocks turning a device **off**. You can always turn a protected device **on**.
 It applies in the tray menu too, where protected devices show *(protected)*.
@@ -171,7 +174,7 @@ previews as you click it and goes back if you discard.
 | **Show disconnected devices** | Lists remembered devices that aren't plugged in. | Off |
 | **Show USB hubs** | Lists hubs. Turning a hub off turns off everything on it. | Off |
 | **Hide devices that aren't working** | Hides devices Windows reports a problem with. | On |
-| **Protect keyboards and mice** | Stops them being turned off by accident. | On |
+| **Protect devices** | Keyboards and mice are protected automatically. While it is on, protected devices can't be turned off or unprotected. Turning it off asks for confirmation. | On |
 | **Confirm risky changes** | Asks before turning off keyboards, mice, hubs and Bluetooth adapters. | On |
 | **Keep running in the tray** | Closing the window hides it instead of quitting. | On |
 | **Start with Windows** | Starts the app when you sign in. As administrator it starts with admin rights and no prompt. | Off |

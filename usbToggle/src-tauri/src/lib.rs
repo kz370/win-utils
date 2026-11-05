@@ -96,8 +96,9 @@ fn apply_config(devices: &mut [Device], cfg: &Config) {
         d.pinned = custom.map(|c| c.pinned).unwrap_or(false);
         d.custom_icon = custom.and_then(|c| c.icon.clone());
         let auto = auto_lock(d, &cfg.settings);
-        d.locked = custom.and_then(|c| c.locked).unwrap_or(auto);
-        d.auto_locked = d.locked && auto && custom.and_then(|c| c.locked).is_none();
+        let explicit = custom.and_then(|c| c.locked);
+        d.locked = config::is_locked(auto, explicit);
+        d.auto_locked = auto && explicit != Some(true);
         d.name = d.custom_name.clone().unwrap_or_else(|| d.default_name.clone());
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then_with(|| a.id.cmp(&b.id)));
@@ -430,18 +431,21 @@ async fn set_pinned(app: AppHandle, id: String, pinned: bool) -> Result<Snapshot
 async fn set_locked(app: AppHandle, id: String, locked: bool) -> Result<Snapshot, String> {
     blocking(move || {
         let core = core(&app);
-        let auto = {
-            let cfg = core.config.lock().unwrap();
-            core.devices
-                .lock()
-                .unwrap()
-                .iter()
-                .find(|d| d.id.eq_ignore_ascii_case(&id))
-                .map(|d| auto_lock(d, &cfg.settings))
-                .unwrap_or(false)
-        };
-        // Store only a choice that differs from the automatic rule.
-        let choice = (locked != auto).then_some(locked);
+        let settings = core.config.lock().unwrap().settings.clone();
+        let (auto, currently_locked) = core
+            .devices
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|d| d.id.eq_ignore_ascii_case(&id))
+            .map(|d| (auto_lock(d, &settings), d.locked))
+            .unwrap_or((false, false));
+        if !locked && currently_locked && !config::may_unprotect(settings.protect_input) {
+            // The window never offers this; refuse it here too.
+            return Err("Protection is on. Turn off \"Protect devices\" in Settings to unprotect devices.".into());
+        }
+        // Only the user's own protection is stored; the automatic rule needs no entry.
+        let choice = (locked && !auto).then_some(true);
         core.config.lock().unwrap().update_device(&id, |d| d.locked = choice);
         save_config(&core)?;
         Ok(reapply_config(&app))

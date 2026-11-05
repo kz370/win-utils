@@ -106,13 +106,14 @@ showHubs          bool     false      list USB hubs
 portsOnly         bool     true       hide devices built into the PC
 confirmRisky      bool     true       confirm before turning off keyboards, mice, hubs, Bluetooth
 hideProblems      bool     true       hide connected devices with a problem code other than 22
-protectInput      bool     true       protect keyboards, mice and keyboard+mouse devices
+protectInput      bool     true       "Protect devices": keyboards, mice and keyboard+mouse are protected automatically;
+                                      while on, protected devices cannot be unprotected
 
 DeviceSettings
 ------------------------------------------------------------------------------
 name              Option<String>   omitted when null
 pinned            bool             omitted when false
-locked            Option<bool>     omitted when null; null = follow protectInput, true/false = user override
+locked            Option<bool>     omitted when null; true = protected by the user (an old false has no effect)
 icon              Option<String>   omitted when null; icon name from ui/icons.js or "l-<lucide name>"
 An entry with no name, pinned=false, no lock choice and no icon is removed.
 
@@ -132,7 +133,6 @@ Example:
   },
   "devices": {
     "USB\\VID_046D&PID_0825\\ABC123": { "name": "Desk webcam", "pinned": true, "locked": true, "icon": "l-video" },
-    "USB\\VID_1532&PID_0084\\7&1": { "locked": false }
   }
 }
 

@@ -387,13 +387,27 @@
   }
 
   async function setLocked(id, locked) {
+    const d = state.byId.get(id);
+    const name = d ? d.name : "Device";
+    if (!locked) {
+      // A protected device stays protected while "Protect devices" is on.
+      if (state.settings.protectInput) {
+        toast(`${name} is protected. To unprotect devices, turn off "Protect devices" in Settings first.`, { kind: "info", duration: 6000 });
+        return;
+      }
+      const ok = await askConfirm({
+        title: `Unprotect ${name}?`,
+        text: "Once unprotected, this device can be turned off with one click. If it is a keyboard or mouse you rely on, you could lock yourself out of the PC until you turn it back on.",
+        okLabel: "Unprotect",
+      });
+      if (!ok) return;
+    }
     try {
       applySnapshot(await invoke("set_locked", { id, locked }));
-      const d = state.byId.get(id);
       toast(
         locked
-          ? `${d ? d.name : "Device"} is protected. It can't be turned off until you unprotect it.`
-          : `${d ? d.name : "Device"} is no longer protected.`,
+          ? `${name} is protected. It can't be turned off or unprotected while "Protect devices" is on.`
+          : `${name} is no longer protected.`,
         { kind: "info" }
       );
     } catch (e) {
@@ -433,8 +447,32 @@
 
   // ------------------------------------------------------- confirmation --
 
-  function confirmDisable(d) {
+  // Warning dialog; resolves true when the confirm button is pressed.
+  // `dontAsk` adds a "Don't ask again" box that turns off "Confirm risky changes".
+  function askConfirm({ title, text, okLabel = "Turn off", dontAsk = false }) {
     const dialog = $("#confirm");
+    $("#confirm-title").textContent = title;
+    $("#confirm-text").textContent = text || "";
+    $("#confirm-ok").textContent = okLabel;
+    $("#confirm-dont-ask").checked = false;
+    $("#confirm-dont-ask-row").hidden = !dontAsk;
+    dialog.returnValue = "";
+    dialog.showModal();
+    $("#confirm-ok").focus();
+    return new Promise((resolve) => {
+      dialog.addEventListener(
+        "close",
+        () => {
+          const ok = dialog.returnValue === "ok";
+          if (ok && dontAsk && $("#confirm-dont-ask").checked) saveSettings({ confirmRisky: false });
+          resolve(ok);
+        },
+        { once: true }
+      );
+    });
+  }
+
+  function confirmDisable(d) {
     const kids = d.category === "hub" ? hubChildren(d).length : 0;
     const text = {
       keyboard: "If this is your only keyboard you won't be able to type until it's turned back on. You can still use the mouse to turn it back on here.",
@@ -446,23 +484,7 @@
           ? `The ${kids} device${kids === 1 ? "" : "s"} plugged into this hub will stop working too`
           : "Everything plugged into this hub will stop working too") + ", including any keyboard or mouse.",
     }[d.category];
-    $("#confirm-title").textContent = `Turn off ${d.name}?`;
-    $("#confirm-text").textContent = text || "";
-    $("#confirm-dont-ask").checked = false;
-    dialog.returnValue = "";
-    dialog.showModal();
-    $("#confirm-ok").focus();
-    return new Promise((resolve) => {
-      dialog.addEventListener(
-        "close",
-        () => {
-          const ok = dialog.returnValue === "ok";
-          if (ok && $("#confirm-dont-ask").checked) saveSettings({ confirmRisky: false });
-          resolve(ok);
-        },
-        { once: true }
-      );
-    });
+    return askConfirm({ title: `Turn off ${d.name}?`, text: text || "", okLabel: "Turn off", dontAsk: true });
   }
 
   // --------------------------------------------------------- rendering --
@@ -599,7 +621,15 @@
     refs.lockMark.hidden = !d.locked;
     refs.lockMark.title = "Protected";
     refs.lock.setAttribute("aria-pressed", String(!!d.locked));
-    refs.lock.title = d.locked ? "Unprotect (allow turning off)" : "Protect (can't be turned off)";
+    // While "Protect devices" is on, a protected device can't be unprotected.
+    const fixed = !!d.locked && !!state.settings.protectInput;
+    refs.lock.classList.toggle("fixed", fixed);
+    refs.lock.setAttribute("aria-disabled", String(fixed));
+    refs.lock.title = fixed
+      ? 'Protected. Turn off "Protect devices" in Settings to unprotect.'
+      : d.locked
+        ? "Unprotect (allow turning off)"
+        : "Protect (can't be turned off)";
     refs.lock.setAttribute("aria-label", refs.lock.title);
     refs.lock.replaceChildren(iconSpan(d.locked ? "lock" : "unlock"));
     refs.meta.replaceChildren(...metaParts(d, row.inPanelSection));
@@ -871,10 +901,8 @@
   }
 
   function protectionText(d) {
-    const autoRule = state.settings.protectInput && ["keyboard", "mouse", "input"].includes(d.category);
     if (d.autoLocked) return "Protected automatically (keyboards and mice)";
     if (d.locked) return "Protected by you";
-    if (autoRule) return "Not protected (you unprotected it)";
     return null;
   }
 
@@ -1285,6 +1313,19 @@
       sw.addEventListener("click", () => {
         if (sw.disabled || !draft) return;
         const key = sw.dataset.setting;
+        if (key === "protectInput" && draft.settings.protectInput) {
+          // Turning protection off is the only way to unprotect devices: warn first.
+          askConfirm({
+            title: "Turn off device protection?",
+            text: "Keyboards and mice will no longer be protected, and every protected device can be turned off or unprotected. If you turn off your only keyboard or mouse you could lock yourself out of the PC until you turn it back on.",
+            okLabel: "Turn off protection",
+          }).then((ok) => {
+            if (!ok) return;
+            draft.settings.protectInput = false;
+            syncSettingsDialog();
+          });
+          return;
+        }
         draft.settings[key] = !draft.settings[key];
         syncSettingsDialog();
       });

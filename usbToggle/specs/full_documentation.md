@@ -145,7 +145,9 @@ The rules below are enforced by the code. Each rule names the place that impleme
 | # | Rule | Implemented in |
 | --- | --- | --- |
 | S0 | A protected (locked) device cannot be turned off. The back end refuses with code `locked` before anything else; turning a protected device **on** is allowed. In the window its switch is greyed out while it is on; in the tray its item is disabled and labelled "(protected)". | `lib::toggle_device`, `ui/app.js: setEnabled, updateRow`, `lib::build_tray_menu` |
-| S0b | A device is protected automatically when *Protect keyboards and mice* is on (default) and its category is keyboard, mouse or keyboard-and-mouse. The lock button stores a per-device choice only when it differs from the automatic rule; that choice overrides the rule either way. | `lib::auto_lock`, `lib::apply_config`, `lib::set_locked` |
+| S0b | A device is protected when *Protect devices* is on (default) and its category is keyboard, mouse or keyboard-and-mouse (automatic rule), or when the user protected it with the lock button (stored as `locked: true`; an old stored `locked: false` has no effect). | `config::is_locked`, `lib::auto_lock`, `lib::apply_config`, `lib::set_locked` |
+| S0c | While *Protect devices* is on, a protected device cannot be unprotected: the lock button is greyed out (clicking it explains why) and the back end refuses `set_locked(false)`. The user may still protect more devices. | `config::may_unprotect`, `lib::set_locked`, `ui/app.js: setLocked, updateRow` |
+| S0d | Turning *Protect devices* off in Settings first shows a warning dialog ("Turn off device protection?"); only after confirming does the draft change (and it takes effect on Save). With the setting off, the lock button works, and unprotecting a device asks for another confirmation ("Unprotect <name>?"). | `ui/app.js: askConfirm, setLocked`, Settings handler |
 | S1 | Only an elevated process may switch devices. Without elevation the request fails immediately with code `accessDenied` and Windows is not called. | `lib::toggle_device` |
 | S2 | Only one switch operation runs at a time (`op_lock`). Other requests wait. | `lib::toggle_device` |
 | S3 | A device with an operation in progress is reported as busy (`busy` event); the window disables its switch and the tray disables its menu item. | `lib::set_busy`, `ui/app.js`, `lib::build_tray_menu` |
@@ -887,8 +889,9 @@ atomically. `Config::device()` and `Config::update_device()` read and change per
   < 3 resets portsOnly/showHubs/showDisconnected to defaults) and set schema to 3; schema > 3 → defaults +
   message; parse error → backup to `config.<timestamp>.bak.json` + defaults + message.
 - **Save:** creates the folder, writes pretty JSON to `config.json.tmp`, renames it over `config.json`.
+- **Functions:** `is_locked` (automatic rule or the user's protection), `may_unprotect` (only with *Protect devices* off).
 - **Tests:** `old_or_partial_files_load`, `v2_files_get_the_new_list_defaults_once`,
-  `empty_device_entries_are_dropped`.
+  `protection_rules`, `empty_device_entries_are_dropped`.
 
 ### Business Logic
 Implements rules P1–P6.

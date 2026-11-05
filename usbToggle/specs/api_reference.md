@@ -49,7 +49,7 @@ One physical USB device. Produced by `devices::assemble()` and `lib::apply_confi
 | `functions` | string[] | Names of the functions under the device (e.g. "HID Keyboard Device"). Empty for hubs. |
 | `pinned` | boolean | Pinned by the user (top of the list and tray menu). |
 | `locked` | boolean | Protected: cannot be turned off (can still be turned on). |
-| `autoLocked` | boolean | Protected by the *Protect keyboards and mice* rule rather than by the user. |
+| `autoLocked` | boolean | Protected by the automatic *Protect devices* rule (keyboards and mice) rather than by the user. |
 | `customIcon` | string \| null | Icon chosen by the user (a built-in icon name such as `mic`, or `l-<name>` from the icon library). `null` means the icon of the detected `category`. |
 
 ### 1.2 `Snapshot`
@@ -73,7 +73,7 @@ One physical USB device. Produced by `devices::assemble()` and `lib::apply_confi
 | `portsOnly` | boolean | true | Hide devices built into the PC. |
 | `confirmRisky` | boolean | true | Ask before turning off keyboards, mice, hubs and Bluetooth adapters. |
 | `hideProblems` | boolean | true | Hide connected devices with a Windows problem code (other than 22, disabled). |
-| `protectInput` | boolean | true | Protect keyboards, mice and keyboard-and-mouse devices from being turned off. |
+| `protectInput` | boolean | true | "Protect devices": protects keyboards, mice and keyboard-and-mouse devices automatically, and while on, protected devices cannot be unprotected. |
 
 ### 1.4 `AutostartState`
 
@@ -225,9 +225,9 @@ Protects or unprotects a device.
 | | |
 | --- | --- |
 | Returns | `Snapshot` (state re-applied, no hardware rescan) |
-| Behavior | When the requested state equals the automatic rule (*Protect keyboards and mice*), the stored choice is cleared so the device follows the rule again; otherwise the choice is stored and overrides the rule. |
+| Behavior | `locked: true` stores the user's protection (nothing is stored for a device the automatic rule already protects). `locked: false` clears it, but is **refused** while `protectInput` is on and the device is protected. |
 | Side effects | Saves `config.json`; emits `devices`; rebuilds the tray menu. |
-| Errors | Rejects with the save error message. |
+| Errors | Rejects with `Protection is on. Turn off "Protect devices" in Settings to unprotect devices.` when unprotecting while protection is on, or with the save error message. |
 
 ```js
 await invoke("set_locked", { id, locked: true }); // can't be turned off any more

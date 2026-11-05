@@ -67,7 +67,7 @@
           <h2 id="confirm-title">Turn off this device?</h2>
         </div>
         <p id="confirm-text"></p>
-        <label class="check">
+        <label class="check" id="confirm-dont-ask-row">
           <input type="checkbox" id="confirm-dont-ask" />
           <span>Don't ask again</span>
         </label>
@@ -129,10 +129,10 @@
           </div>
           <div class="setting">
             <div>
-              <span class="setting-title">Protect keyboards and mice</span>
-              <span class="setting-desc">They stay in the list but can't be turned off by accident. Use the lock on any device to protect or unprotect it.</span>
+              <span class="setting-title">Protect devices</span>
+              <span class="setting-desc">Keyboards and mice are protected automatically, and you can protect any device with its lock. While this is on, protected devices can't be turned off or unprotected.</span>
             </div>
-            <button class="switch" role="switch" data-setting="protectInput" aria-label="Protect keyboards and mice"><span class="knob"></span></button>
+            <button class="switch" role="switch" data-setting="protectInput" aria-label="Protect devices"><span class="knob"></span></button>
           </div>
           <div class="setting">
             <div>

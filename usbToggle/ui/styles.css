@@ -797,6 +797,17 @@ button.section-head:hover {
   color: var(--accent);
 }
 
+/* Protected and can't be unprotected while "Protect devices" is on. */
+.lock-btn.fixed {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.lock-btn.fixed:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
 .device-name .lock-mark {
   width: 13px;
   height: 13px;
