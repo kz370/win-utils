@@ -50,7 +50,7 @@ One physical USB device. Produced by `devices::assemble()` and `lib::apply_confi
 | `pinned` | boolean | Pinned by the user (top of the list and tray menu). |
 | `locked` | boolean | Protected: cannot be turned off (can still be turned on). |
 | `autoLocked` | boolean | Protected by the automatic *Protect devices* rule (keyboards and mice) rather than by the user. |
-| `customIcon` | string \| null | Icon chosen by the user (a built-in icon name such as `mic`, or `l-<name>` from the icon library). `null` means the icon of the detected `category`. |
+| `customIcon` | string \| null | Icon chosen by the user: a built-in icon name such as `mic`, `l-<name>` from the icon library, or an uploaded image as a PNG data URL (`data:image/png;base64,...`). `null` means the icon of the detected `category`. |
 
 ### 1.2 `Snapshot`
 
@@ -240,13 +240,13 @@ Sets or clears a device's custom icon.
 | Argument | Type | Description |
 | --- | --- | --- |
 | `id` | string | Device instance ID. |
-| `icon` | string \| null | Icon name, or `null` (or empty) to use the automatic icon. Must match `[a-z0-9-]{1,32}`. |
+| `icon` | string \| null | An icon name matching `[a-z0-9-]{1,32}`, or a PNG data URL (`data:image/png;base64,` followed by base64, at most 48,000 characters in total), or `null` (or empty) to use the automatic icon. |
 
 | | |
 | --- | --- |
 | Returns | `Snapshot` (no hardware rescan) |
 | Side effects | Saves `config.json`; emits `devices`. |
-| Errors | Rejects with `Unknown icon "<name>".` for an invalid name, or with the save error message. The back end checks only the name format; the window falls back to the automatic icon for names it does not know. |
+| Errors | Rejects with `That icon isn't valid. Use an icon from the list or a small PNG image.` for anything else, or with the save error message. The back end checks only the format and length; the window falls back to the automatic icon for names it does not know. Size and dimension limits for uploads are enforced by the window (see the full documentation, rule I4). |
 
 ```js
 await invoke("set_icon", { id, icon: "l-guitar" });

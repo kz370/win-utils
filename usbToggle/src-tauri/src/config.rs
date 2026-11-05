@@ -60,10 +60,27 @@ pub struct DeviceSettings {
     /// old `Some(false)`) mean no choice: only the automatic rule applies.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locked: Option<bool>,
-    /// Icon chosen by the user (an icon name from ui/icons.js). `None` uses
-    /// the icon of the detected device type.
+    /// Icon chosen by the user: an icon name (ui/icons.js, "l-<name>") or an
+    /// uploaded image as a small PNG data URL. `None` uses the icon of the
+    /// detected device type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+}
+
+/// Longest accepted custom image (a PNG data URL); the window shrinks images to
+/// about 64x64, which is far below this.
+pub const MAX_ICON_LEN: usize = 48_000;
+const IMAGE_ICON_PREFIX: &str = "data:image/png;base64,";
+
+/// A device icon is either the name of a built-in or library icon ("mic",
+/// "l-guitar") or a small PNG the user uploaded, stored as a data URL.
+pub fn valid_icon(icon: &str) -> bool {
+    if let Some(data) = icon.strip_prefix(IMAGE_ICON_PREFIX) {
+        return !data.is_empty()
+            && icon.len() <= MAX_ICON_LEN
+            && data.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'=');
+    }
+    !icon.is_empty() && icon.len() <= 32 && icon.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// A device is protected by the automatic rule or by the user's own choice.
@@ -220,6 +237,22 @@ mod tests {
         store.save(&cfg).unwrap();
         assert!(store.load().0.settings.show_hubs);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn icon_validation() {
+        assert!(valid_icon("mic"));
+        assert!(valid_icon("l-guitar"));
+        assert!(!valid_icon(""));
+        assert!(!valid_icon("Has Spaces"));
+        assert!(!valid_icon(&"a".repeat(33)));
+        assert!(valid_icon("data:image/png;base64,iVBORw0KGgo="));
+        assert!(!valid_icon("data:image/png;base64,"), "empty image");
+        assert!(!valid_icon("data:image/svg+xml;base64,PHN2Zz4="), "only PNG is stored");
+        assert!(!valid_icon("data:image/png;base64,<script>"), "not base64");
+        assert!(!valid_icon("https://example.com/icon.png"));
+        let big = format!("data:image/png;base64,{}", "A".repeat(MAX_ICON_LEN));
+        assert!(!valid_icon(&big), "too large");
     }
 
     #[test]

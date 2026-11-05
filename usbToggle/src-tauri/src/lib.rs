@@ -453,17 +453,12 @@ async fn set_locked(app: AppHandle, id: String, locked: bool) -> Result<Snapshot
     .await?
 }
 
-/// Icon names are short identifiers from ui/icons.js; anything else is refused.
-fn valid_icon_name(name: &str) -> bool {
-    !name.is_empty() && name.len() <= 32 && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
 #[tauri::command]
 async fn set_icon(app: AppHandle, id: String, icon: Option<String>) -> Result<Snapshot, String> {
     let icon = icon.filter(|i| !i.is_empty());
     if let Some(i) = &icon {
-        if !valid_icon_name(i) {
-            return Err(format!("Unknown icon \"{i}\"."));
+        if !config::valid_icon(i) {
+            return Err("That icon isn't valid. Use an icon from the list or a small PNG image.".into());
         }
     }
     blocking(move || {

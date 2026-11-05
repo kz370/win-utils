@@ -114,7 +114,8 @@ DeviceSettings
 name              Option<String>   omitted when null
 pinned            bool             omitted when false
 locked            Option<bool>     omitted when null; true = protected by the user (an old false has no effect)
-icon              Option<String>   omitted when null; icon name from ui/icons.js or "l-<lucide name>"
+icon              Option<String>   omitted when null; icon name from ui/icons.js, "l-<lucide name>", or an uploaded
+                                   image as "data:image/png;base64,..." (at most 48,000 characters)
 An entry with no name, pinned=false, no lock choice and no icon is removed.
 
 Example:
@@ -258,6 +259,11 @@ Built-in keys     usb, keyboard, mouse, input, gamepad, audio, camera, storage, 
                   printer, serial, security, hub, other (= the Category values), plus mic, speaker, monitor,
                   pen, card, light, fan. The picker's quick row offers 22 of them (ICON_CHOICES).
 Library keys      "l-<lucide name>", e.g. "l-guitar"; 239 icons in 16 groups (ICON_LIBRARY.groups).
+Uploaded image    "data:image/png;base64,..." - the user's picture shrunk to 64, 48 or 32 px (the first size whose
+                  data URL is at most 40,000 characters); shown as-is in a neutral tile, not recolored.
+Upload limits     (ui/app.js UPLOAD) file at most 2 MB; each side 16-4096 px; long side at most 4x the short side;
+                  extensions png, jpg, jpeg, gif, webp, bmp, svg, ico (or an image MIME type); SVGs without a size
+                  skip the pixel checks.
 Color             Category icons use their category color (cat-<category>); extra built-in icons borrow one
                   (ICON_COLOR); library icons use the color of their group.
 

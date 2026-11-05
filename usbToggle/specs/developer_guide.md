@@ -156,6 +156,8 @@ do not depend on Tauri or Win32).
 - Rename, reset the name, pin and unpin; restart the app and check they persist.
 - Choose an icon in a device's details (quick row, then *More icons* with search); *Auto* goes back to the
   detected icon. Restart and check the choice persists.
+- Upload an image as a device icon: a normal PNG/SVG works; an 8×8 px image, a 5000×5000 px image, a
+  400×50 px strip, a file over 2 MB and a text file renamed `.png` are each refused with a clear message.
 - Settings: toggling a switch changes nothing until *Save*; × / Esc / click outside with changes shows
   *Discard* / *Save*; *Discard* restores the previous theme; Ctrl+S saves.
 - Run `set-icons.bat` with a test PNG, then `build.bat`: the exe, installer, taskbar, tray and header logo all

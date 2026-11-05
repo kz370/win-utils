@@ -66,11 +66,25 @@
   ];
   const ICON_COLOR = { mic: "audio", speaker: "audio", monitor: "input", pen: "input", card: "storage", light: "gamepad", fan: "network" };
   const autoIconKey = (d) => (d.category in CATEGORY ? d.category : "other");
-  const knownIcon = (key) => !!key && (!!window.ICONS[key] || !!(window.ICON_LIBRARY && window.ICON_LIBRARY.has(key)));
+  // Uploaded device icons are shrunk to a small PNG. Limits checked before that:
+  const UPLOAD = {
+    maxBytes: 2 * 1024 * 1024, // file size
+    minPx: 16, // smaller than this looks blurry as an icon
+    maxPx: 4096, // larger images are refused instead of decoded
+    maxRatio: 4, // longest side at most 4x the shortest (not a thin strip)
+    sizes: [64, 48, 32], // tried in turn until the result is small enough
+    maxData: 40000, // longest stored PNG data URL (the back end allows 48000)
+    extensions: /\.(png|jpe?g|gif|webp|bmp|svg|ico)$/i,
+  };
+  const UPLOAD_HINT = `PNG, JPG, SVG, GIF, WebP · up to ${UPLOAD.maxBytes / 1024 / 1024} MB · ${UPLOAD.minPx}–${UPLOAD.maxPx} px`;
+  const isImageIcon = (key) => typeof key === "string" && key.startsWith("data:image/png;base64,");
+  const knownIcon = (key) =>
+    !!key && (isImageIcon(key) || !!window.ICONS[key] || !!(window.ICON_LIBRARY && window.ICON_LIBRARY.has(key)));
   const iconKey = (d) => (knownIcon(d.customIcon) ? d.customIcon : autoIconKey(d));
   const colorOf = (key) =>
     ICON_COLOR[key] || (window.ICON_LIBRARY && window.ICON_LIBRARY.has(key) ? window.ICON_LIBRARY.color(key) : key);
   const iconLabel = (key) => {
+    if (isImageIcon(key)) return "Your image";
     const builtIn = ICON_CHOICES.find(([k]) => k === key);
     if (builtIn) return builtIn[1];
     const name = key.startsWith("l-") ? key.slice(2) : key;
@@ -612,8 +626,8 @@
     const key = iconKey(d);
     if (row.iconKey !== key) {
       row.iconKey = key;
-      refs.tile.className = `tile cat-${colorOf(key)}`;
-      refs.tile.replaceChildren(iconSpan(key));
+      refs.tile.className = isImageIcon(key) ? "tile custom-image" : `tile cat-${colorOf(key)}`;
+      refs.tile.replaceChildren(iconNode(key));
     }
     refs.label.textContent = d.name;
     refs.label.title = d.name;
@@ -781,6 +795,73 @@
     );
   }
 
+  // The icon itself: an <img> for an uploaded image, else an inline SVG.
+  function iconNode(key) {
+    return isImageIcon(key) ? h("img", { class: "icon-img", src: key, alt: "", draggable: "false" }) : iconSpan(key);
+  }
+
+  // Turns a chosen file into a small PNG data URL, or throws a message for the user.
+  async function imageToIcon(file) {
+    const mb = UPLOAD.maxBytes / 1024 / 1024;
+    if (!UPLOAD.extensions.test(file.name) && !(file.type || "").startsWith("image/")) {
+      throw new Error("Choose an image file: PNG, JPG, SVG, GIF, WebP, BMP or ICO.");
+    }
+    if (file.size === 0) throw new Error("That file is empty.");
+    if (file.size > UPLOAD.maxBytes) {
+      throw new Error(`That file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is ${mb} MB.`);
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error("That file couldn't be read as an image."));
+        i.src = url;
+      });
+      // SVGs without a size report 0; they scale to anything, so skip the size checks.
+      const w = img.naturalWidth;
+      const hgt = img.naturalHeight;
+      const sized = w > 0 && hgt > 0;
+      if (sized) {
+        if (Math.min(w, hgt) < UPLOAD.minPx) {
+          throw new Error(`That image is ${w}×${hgt} px. It must be at least ${UPLOAD.minPx}×${UPLOAD.minPx} px.`);
+        }
+        if (Math.max(w, hgt) > UPLOAD.maxPx) {
+          throw new Error(`That image is ${w}×${hgt} px. The limit is ${UPLOAD.maxPx}×${UPLOAD.maxPx} px.`);
+        }
+        if (Math.max(w, hgt) / Math.min(w, hgt) > UPLOAD.maxRatio) {
+          throw new Error(`That image is ${w}×${hgt} px, too narrow for an icon. Use one that is closer to square.`);
+        }
+      }
+      const sw = sized ? w : 64;
+      const sh = sized ? hgt : 64;
+      for (const size of UPLOAD.sizes) {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        const scale = Math.min(size / sw, size / sh);
+        const dw = sw * scale;
+        const dh = sh * scale;
+        ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+        const data = canvas.toDataURL("image/png");
+        if (data.length <= UPLOAD.maxData) return data;
+      }
+      throw new Error("That image is too detailed to use as an icon. Try a simpler one.");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function uploadIcon(id, file) {
+    if (!file) return;
+    try {
+      await setIcon(id, await imageToIcon(file));
+    } catch (e) {
+      errorToast(e && e.message ? e.message : String(e));
+    }
+  }
+
   function iconButton(key, label, onPick, extraClass = "") {
     return h(
       "button",
@@ -792,7 +873,7 @@
         "data-key": key,
         onclick: onPick,
       },
-      iconSpan(key)
+      iconNode(key)
     );
   }
 
@@ -816,9 +897,26 @@
       return b;
     });
 
+    const fileInput = h("input", {
+      type: "file",
+      accept: "image/*,.ico",
+      hidden: true,
+      "aria-label": "Choose an image",
+      onchange: () => {
+        uploadIcon(d.id, fileInput.files[0]);
+        fileInput.value = ""; // the same file can be chosen again
+      },
+    });
+    const uploadBtn = h(
+      "button",
+      { class: "link-btn upload-btn", type: "button", title: UPLOAD_HINT, onclick: () => fileInput.click() },
+      "Upload your own image"
+    );
+    const uploadRow = h("div", { class: "icon-upload" }, uploadBtn, h("span", { class: "upload-hint", text: UPLOAD_HINT }), fileInput);
+
     if (!picker._library) picker._library = buildIconLibrary(d.id);
     picker._library.sync(current);
-    picker.replaceChildren(h("div", { class: "icon-quick" }, autoBtn, ...quick), picker._library.root);
+    picker.replaceChildren(h("div", { class: "icon-quick" }, autoBtn, ...quick), uploadRow, picker._library.root);
   }
 
   function buildIconLibrary(id) {

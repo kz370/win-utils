@@ -139,7 +139,9 @@ Open a row's details to:
   the automatic name.
 - **Choose an icon.** **Auto** uses the icon for the detected type. The quick row has common icons;
   **More icons** opens a searchable library of 239 icons (type "guitar", "light", "fan", …). Press
-  Enter in the search box to pick the first match.
+  Enter in the search box to pick the first match. **Upload your own image** uses a picture from your PC
+  (PNG, JPG, SVG, GIF, WebP, BMP or ICO): up to **2 MB**, between **16 and 4096 px**, and not a thin strip
+  (the long side at most 4× the short side). It is shrunk to a small icon and saved with your other settings.
 
 On the row itself (hover it), the **pin** button pins the device: it moves to the top and appears in
 the tray menu.
@@ -221,6 +223,7 @@ icons. More in `assets\README.md`.
 | Problem | What to do |
 | --- | --- |
 | Switches don't work, or "needs administrator rights" | Click **Restart as admin** or run the app as administrator. |
+| "That image is too small / too large …" when uploading an icon | Use an image of 16–4096 px per side, up to 2 MB, closer to square than 4:1. |
 | A device isn't in the list | It may be hidden: look for the note at the end of the list, or check *Only devices on USB ports*, *Show USB hubs* and *Hide devices that aren't working* in Settings. Searching also shows hidden hubs and disconnected devices (but not built-in or not-working ones: use *Show them*). Try **Refresh**. |
 | I turned off my keyboard or mouse | Use the other one (or the touch screen) to turn it back on. Keyboards and mice are protected by default so this shouldn't happen. If neither works, restart the PC and use Device Manager (*Enable device*). |
 | A device shows **Problem (code 43)** | Windows stopped the device because it reported a problem. Unplug it and plug it in again, try another port, or check the cable. |

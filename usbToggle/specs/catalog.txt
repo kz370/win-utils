@@ -101,7 +101,7 @@ rename_device               (lib.rs)        - [command] Sets or clears a custom 
 set_pinned                  (lib.rs)        - [command] Pins or unpins a device.
 set_locked                  (lib.rs)        - [command] Protects or unprotects a device.
 set_icon                    (lib.rs)        - [command] Sets or clears a device's custom icon (validates the name).
-valid_icon_name             (lib.rs)        - True for icon names matching [a-z0-9-]{1,32}.
+valid_icon                  (config.rs)     - True for an icon name ([a-z0-9-]{1,32}) or a PNG data URL of at most 48,000 characters.
 save_settings               (lib.rs)        - [command] Saves settings, applies the theme, re-applies device state.
 set_autostart               (lib.rs)        - [command] Turns "Start with Windows" on or off.
 restart_as_admin            (lib.rs)        - [command] Relaunches elevated and exits.
@@ -227,6 +227,11 @@ setPinned, rename           - Pin and rename actions.
 setLocked                   - Protect / unprotect action; unprotecting is refused while "Protect devices" is on, else asks first.
 askConfirm                  - Reusable warning dialog (title, text, button label, optional "Don't ask again").
 setIcon                     - Sets or clears a device's custom icon.
+uploadIcon                  - Converts a chosen image file and stores it as the device's icon; shows an error toast on failure.
+imageToIcon                 - Validates an image (type, size, dimensions, shape) and returns a small PNG data URL, or throws a message.
+iconNode                    - The icon element: <img> for an uploaded image, else inline SVG.
+isImageIcon                 - True for an uploaded-image icon (PNG data URL).
+UPLOAD, UPLOAD_HINT         - Upload limits (2 MB, 16-4096 px, max 4:1) and the hint text under the upload button.
 restartAsAdmin              - Invokes restart_as_admin.
 copy                        - Copies text to the clipboard.
 confirmDisable              - Confirmation dialog for risky devices.
