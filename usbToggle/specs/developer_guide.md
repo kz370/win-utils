@@ -33,12 +33,12 @@ dependency.
 ```
 usbToggle/
   build.bat                 release build: exe, portable ZIP, installer
+  assets/                   app_icon.ico, tray_icon.ico, header_logo.png, source/ (SVG artwork)
   package.json              Tauri CLI
   installer/                Inno Setup script, portable marker
   ui/                       window: index.html, app.js, styles.css, icons.js, logo.svg
   src-tauri/
     Cargo.toml, Cargo.lock, build.rs, tauri.conf.json, capabilities/
-    icons/                  app icon set, tray PNGs, SVG sources
     src/                    Rust: lib.rs (core), devices.rs, classify.rs, control.rs, config.rs,
                             autostart.rs, elevation.rs, notify.rs, paths.rs, logger.rs, win.rs, main.rs
   specs/                    this documentation
@@ -50,7 +50,7 @@ usbToggle/
 
 | Crate | Purpose |
 | --- | --- |
-| `tauri` 2 (`tray-icon`, `image-png`) | Window, tray, IPC, events; PNG decoding for tray icons |
+| `tauri` 2 (`tray-icon`, `image-png`, `image-ico`) | Window, tray, IPC, events; decoding of the tray `.ico` |
 | `tauri-plugin-single-instance` 2 | One running instance |
 | `windows-sys` 0.61 | Win32 bindings (SetupAPI, CfgMgr32, Properties, Security, Threading, Shell) |
 | `serde`, `serde_json` | IPC payloads, `config.json` |
@@ -159,7 +159,8 @@ do not depend on Tauri or Win32).
 - Settings: toggling a switch changes nothing until *Save*; × / Esc / click outside with changes shows
   *Discard* / *Save*; *Discard* restores the previous theme; Ctrl+S saves.
 - Run `set-icons.bat` with a test PNG, then `build.bat`: the exe, installer, taskbar, tray and header logo all
-  show the new icon; `set-icons.bat --reset` restores the default.
+  show the new icon; `set-icons.bat --reset` restores the default. Also try copying your own `.ico` files over
+  the ones in `assets/` and rebuilding.
 - Enable *Start with Windows* as admin; sign out and in; the app starts in the tray without UAC.
 - Close the window (hides to tray), *Quit* from the tray, launch twice (focuses the first window).
 - Damage `config.json`: the app starts with defaults, shows a notice and leaves a `.bak.json`.
@@ -248,19 +249,27 @@ Emit with `app.emit("name", payload)` (payload `Serialize`), listen in `init()` 
 
 ### 6.6 Change the application icons
 
-Run `set-icons.bat` in the `usbToggle` folder (or drag an image onto it):
+The icons are three files in `assets/`, named after where they show:
+
+| File | Where it shows |
+| --- | --- |
+| `app_icon.ico` | Window, taskbar, Start menu, the `.exe`, the installer |
+| `tray_icon.ico` | Tray icon |
+| `header_logo.png` | Logo in the window header |
+
+Replace them by hand (keep the names), or run `set-icons.bat` in the `usbToggle` folder:
 
 ```bat
-set-icons.bat my-icon.png          one image for everything
-set-icons.bat app.png tray.png     a separate tray image
-set-icons.bat --reset              back to the built-in artwork
+set-icons.bat my-icon.png          one image for everything (or drag it onto the file)
+set-icons.bat app.png tray.png     a separate image for the tray
+set-icons.bat --reset              back to the built-in icons
 ```
 
-Images must be square PNG (512×512 or larger) or SVG with a transparent background. The script copies them
-into `src-tauri/icons/source/` (`icon.*`, `tray.*`, optionally `icon-small.*` for the 16/20/24 px frames) and
-regenerates `icon.ico`, the rest of the Tauri icon set, `icons/tray/<size>.png` and `ui/logo.png`. The built-in
-artwork lives in `src-tauri/icons/source/default/`. Rebuild with `build.bat` afterwards. If Windows still shows
-the old icon on the taskbar or desktop, unpin and re-pin the app (Windows caches icons).
+Images must be square PNG or SVG (512×512 or larger, transparent background). By hand, `app_icon.ico` should
+contain 16, 24, 32, 48 and 256 px frames and `tray_icon.ico` at least 16, 24 and 32 px (the tray picks the frame
+that fits the screen scale). Rebuild with `build.bat` afterwards. `build.rs` copies `header_logo.png` to
+`ui/logo.png`, a generated file that git ignores. If Windows still shows the old icon on the taskbar or desktop,
+unpin and re-pin the app (Windows caches icons). The built-in artwork is in `assets/source/`.
 
 ### 6.7 Add or change library icons
 

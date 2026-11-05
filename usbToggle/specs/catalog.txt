@@ -21,6 +21,7 @@ notify              [module]  (src-tauri/src/notify.rs)      - Device-change not
 paths               [module]  (src-tauri/src/paths.rs)       - Installed vs. portable file locations.
 logger              [module]  (src-tauri/src/logger.rs)      - Rotating file logger and log macros.
 win                 [module]  (src-tauri/src/win.rs)         - UTF-16 helpers, last error, console-less commands.
+ico                 [module]  (src-tauri/src/ico.rs)         - Picks the best frame of a multi-size .ico (tray icon).
 app.js              [module]  (ui/app.js)                    - Front-end state, rendering, interactions and IPC calls.
 icons.js            [module]  (ui/icons.js)                  - Inline SVG icon set (window.ICONS, window.icon).
 icon-library.js     [module]  (ui/icon-library.js)           - Generated Lucide icon library: 239 icons, groups, keywords (window.ICON_LIBRARY).
@@ -85,7 +86,7 @@ toggle_device               (lib.rs)        - Full enable/disable operation: pro
 update_tray                 (lib.rs)        - Replaces the tray menu and tooltip.
 build_tray_menu             (lib.rs)        - Builds the tray menu from a snapshot (pinned devices + commands).
 on_menu_event               (lib.rs)        - Handles tray menu clicks (show, quit, refresh, device toggle).
-tray_icon                   (lib.rs)        - Picks the embedded tray PNG for a monitor scale factor.
+tray_icon                   (lib.rs)        - Picks the frame of the built-in assets/tray_icon.ico for a monitor scale factor.
 show_main                   (lib.rs)        - Unminimizes, shows and focuses the main window.
 toggle_main                 (lib.rs)        - Shows or hides the main window (tray left click).
 apply_theme                 (lib.rs)        - Sets the native window theme from the setting.
@@ -185,11 +186,12 @@ Logger::init                (logger.rs)     - Creates the log folder and sets th
 Logger::log                 (logger.rs)     - Appends a line; rotates at 1 MB.
 log_dir                     (logger.rs)     - Delegates to paths::log_dir.
 log_info!, log_error!       (logger.rs)     - [macro] Formats and logs at INFO / ERROR.
+pick_frame                  (ico.rs)        - One-frame .ico with the smallest frame at least `want` px wide (else the largest).
 wide                        (win.rs)        - String to NUL-terminated UTF-16.
 wide_to_string              (win.rs)        - UTF-16 buffer to trimmed String.
 last_error                  (win.rs)        - GetLastError().
 hidden_command              (win.rs)        - std::process::Command with CREATE_NO_WINDOW.
-tauri_build::build          (build.rs)      - Build script entry (embeds icons/config).
+main [build]               (build.rs)      - Build script: copies assets/header_logo.png to ui/logo.png, then tauri_build::build() (embeds assets/app_icon.ico and version info).
 
 ------------------------------------------------------------------------------
 FUNCTIONS AND CONSTANTS (front end, ui/app.js)
@@ -285,9 +287,10 @@ UI COMPONENTS (ui/index.html + ui/styles.css)
 BUILD AND DEPLOYMENT COMPONENTS
 ------------------------------------------------------------------------------
 build.bat                   - Builds exe, portable folder + ZIP, and the Inno installer into dist\.
-set-icons.bat               - Regenerates all app icons from one or two images (or --reset); runs tools/set-icons.ps1.
-tools/set-icons.ps1         - Builds icon.ico, the Tauri icon set, tray PNGs and ui/logo.png from PNG/SVG sources.
-  Say, Import-Image, Find-Custom, Remove-Custom, Invoke-TauriIcon, Write-Ico  [ps1] - Helpers of set-icons.ps1.
+set-icons.bat               - Replaces the icons in assets\ from one or two images (or --reset); runs tools/set-icons.ps1.
+tools/set-icons.ps1         - Builds assets/app_icon.ico, assets/tray_icon.ico and assets/header_logo.png from PNG/SVG images.
+  Say, Test-Image, Invoke-TauriIcon, Write-Ico  [ps1] - Helpers of set-icons.ps1.
+assets/                     - app_icon.ico, tray_icon.ico, header_logo.png, source/*.svg (built-in artwork).
 tools/build-icon-library.mjs - Generates ui/icon-library.js from tools/icon-library.txt and lucide-static.
 tools/icon-library.txt      - The list of library icons and their groups.
 installer/usbToggle.iss     - Inno Setup script (install, WebView2 check, clean uninstall).

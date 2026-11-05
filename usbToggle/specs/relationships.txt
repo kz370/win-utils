@@ -34,7 +34,8 @@ lib::on_menu_event | emits | event:toast
 lib::on_menu_event | calls | lib::refresh
 lib::update_tray | calls | lib::build_tray_menu
 lib::run | calls | lib::tray_icon
-lib::tray_icon | embeds | icons/tray/*.png
+lib::tray_icon | embeds | assets/tray_icon.ico
+lib::tray_icon | calls | ico::pick_frame
 lib::get_info | calls | autostart::state
 lib::get_info | calls | logger::log_dir
 lib::get_devices | calls | lib::refresh
@@ -126,7 +127,8 @@ command:* | implements | lib.rs #[tauri::command] functions
 # Configuration and build
 src-tauri/build.rs | calls | tauri_build::build
 tauri_build::build | reads | tauri.conf.json
-tauri_build::build | embeds | icons/icon.ico (exe resource)
+tauri_build::build | embeds | assets/app_icon.ico (exe resource)
+src-tauri/build.rs | writes | ui/logo.png (copy of assets/header_logo.png)
 tauri.conf.json | configures | frontendDist ../ui (embedded assets)
 tauri.conf.json | configures | main window (created in lib::run)
 capabilities/default.json | configures | permissions of window "main"
@@ -140,16 +142,16 @@ build.bat | packages | dist/usbToggle-<version>-portable.zip
 build.bat | ships | installer/portable.txt
 build.bat | calls | ISCC.exe installer/usbToggle.iss
 installer/usbToggle.iss | ships | usbToggle.exe, README.md
-installer/usbToggle.iss | uses | icons/icon.ico
+installer/usbToggle.iss | uses | assets/app_icon.ico
 installer/usbToggle.iss | uses | taskkill.exe, schtasks.exe, reg.exe
 installer/usbToggle.iss | reads | WebView2 registration (EdgeUpdate client key)
 
 # Assets
 set-icons.bat | calls | tools/set-icons.ps1
 tools/set-icons.ps1 | uses | npx tauri icon (Tauri CLI, rasterizes PNG and SVG)
-tools/set-icons.ps1 | reads | icons/source/icon.png|svg, tray.png|svg, icon-small.png|svg (your images)
-tools/set-icons.ps1 | reads | icons/source/default/icon.svg, tray.svg, icon-small.svg (built-in artwork)
-tools/set-icons.ps1 | writes | icons/icon.ico, icons/*.png, icons/icon.icns, icons/tray/*.png, ui/logo.png
+tools/set-icons.ps1 | reads | your PNG/SVG image(s) given on the command line
+tools/set-icons.ps1 | reads | assets/source/app_icon.svg, app_icon_small.svg, tray_icon.svg (with --reset)
+tools/set-icons.ps1 | writes | assets/app_icon.ico, assets/tray_icon.ico, assets/header_logo.png
 tools/build-icon-library.mjs | reads | tools/icon-library.txt
 tools/build-icon-library.mjs | reads | lucide-static (icons, tags, license)
 tools/build-icon-library.mjs | writes | ui/icon-library.js

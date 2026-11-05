@@ -18,7 +18,7 @@ stubs that report "only supported on Windows"; there is no cross-platform functi
 
 | Area | Technology | Notes |
 | --- | --- | --- |
-| Application framework | Tauri 2 (`tauri` crate 2.x, features `tray-icon`, `image-png`) | Window, tray icon, IPC, event bus |
+| Application framework | Tauri 2 (`tauri` crate 2.x, features `tray-icon`, `image-png`, `image-ico`) | Window, tray icon, IPC, event bus |
 | Single instance | `tauri-plugin-single-instance` 2.x | A second launch focuses the running window |
 | Back-end language | Rust 2021 edition (minimum 1.77.2) | `src-tauri/src/*.rs` |
 | Windows API bindings | `windows-sys` 0.61 | SetupAPI, CfgMgr32, Security, Threading, Shell |
@@ -90,6 +90,7 @@ Key design decisions:
 | `autostart.rs` | Domain | "Start with Windows" via logon task or Run key | `state()`, `set()`, `AutostartState` |
 | `elevation.rs` | Platform | Elevation check, elevated relaunch, wait for the previous instance | `is_elevated()`, `relaunch_elevated()`, `wait_for_previous_instance()` |
 | `notify.rs` | Platform | Device-change notifications with debouncing, polling fallback | `watch()` |
+| `ico.rs` | Platform | Picks the frame of a multi-size `.ico` that fits the screen scale (tray icon) | `pick_frame()` |
 | `paths.rs` | Platform | Installed vs. portable data locations | `config_dir()`, `log_dir()`, `webview_dir()`, `is_portable()` |
 | `logger.rs` | Platform | Small rotating file logger | `LOGGER`, `log_info!`, `log_error!`, `log_dir()` |
 | `win.rs` | Platform | UTF-16 helpers, last error, console-less child processes | `wide()`, `wide_to_string()`, `last_error()`, `hidden_command()` |
@@ -106,7 +107,7 @@ Key design decisions:
 | Build script | `build.bat` | Builds the exe, the portable ZIP and the Inno installer into `dist\` |
 | Installer | `installer/usbToggle.iss` | Per-machine install, WebView2 check, clean uninstall |
 | Portable marker | `installer/portable.txt` | Switches the app to portable data storage |
-| Icons | `src-tauri/icons/` | App icon in all sizes, tray glyphs per DPI, editable SVG sources |
+| Icons | `assets/` | `app_icon.ico` (window, taskbar, exe, installer), `tray_icon.ico`, `header_logo.png`, editable SVG sources in `assets/source/` |
 
 Files written at run time:
 

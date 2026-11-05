@@ -6,6 +6,13 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 
 - .gitignore
 - README.md
+- assets/README.md
+- assets/app_icon.ico
+- assets/header_logo.png
+- assets/source/app_icon.svg
+- assets/source/app_icon_small.svg
+- assets/source/tray_icon.svg
+- assets/tray_icon.ico
 - build.bat
 - installer/portable.txt
 - installer/usbToggle.iss
@@ -16,39 +23,13 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/Cargo.toml
 - src-tauri/build.rs
 - src-tauri/capabilities/default.json
-- src-tauri/icons/128x128.png
-- src-tauri/icons/128x128@2x.png
-- src-tauri/icons/32x32.png
-- src-tauri/icons/Square107x107Logo.png
-- src-tauri/icons/Square142x142Logo.png
-- src-tauri/icons/Square150x150Logo.png
-- src-tauri/icons/Square284x284Logo.png
-- src-tauri/icons/Square30x30Logo.png
-- src-tauri/icons/Square310x310Logo.png
-- src-tauri/icons/Square44x44Logo.png
-- src-tauri/icons/Square71x71Logo.png
-- src-tauri/icons/Square89x89Logo.png
-- src-tauri/icons/StoreLogo.png
-- src-tauri/icons/icon.icns
-- src-tauri/icons/icon.ico
-- src-tauri/icons/icon.png
-- src-tauri/icons/source/README.md
-- src-tauri/icons/source/default/icon-small.svg
-- src-tauri/icons/source/default/icon.svg
-- src-tauri/icons/source/default/tray.svg
-- src-tauri/icons/tray/16.png
-- src-tauri/icons/tray/20.png
-- src-tauri/icons/tray/24.png
-- src-tauri/icons/tray/32.png
-- src-tauri/icons/tray/40.png
-- src-tauri/icons/tray/48.png
-- src-tauri/icons/tray/64.png
 - src-tauri/src/autostart.rs
 - src-tauri/src/classify.rs
 - src-tauri/src/config.rs
 - src-tauri/src/control.rs
 - src-tauri/src/devices.rs
 - src-tauri/src/elevation.rs
+- src-tauri/src/ico.rs
 - src-tauri/src/lib.rs
 - src-tauri/src/logger.rs
 - src-tauri/src/main.rs
@@ -63,13 +44,19 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - ui/icon-library.js
 - ui/icons.js
 - ui/index.html
-- ui/logo.png
 - ui/styles.css
 
 ## Files Processed
 
 - .gitignore
 - README.md
+- assets/README.md
+- assets/app_icon.ico
+- assets/header_logo.png
+- assets/source/app_icon.svg
+- assets/source/app_icon_small.svg
+- assets/source/tray_icon.svg
+- assets/tray_icon.ico
 - build.bat
 - installer/portable.txt
 - installer/usbToggle.iss
@@ -80,39 +67,13 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/Cargo.toml
 - src-tauri/build.rs
 - src-tauri/capabilities/default.json
-- src-tauri/icons/128x128.png
-- src-tauri/icons/128x128@2x.png
-- src-tauri/icons/32x32.png
-- src-tauri/icons/Square107x107Logo.png
-- src-tauri/icons/Square142x142Logo.png
-- src-tauri/icons/Square150x150Logo.png
-- src-tauri/icons/Square284x284Logo.png
-- src-tauri/icons/Square30x30Logo.png
-- src-tauri/icons/Square310x310Logo.png
-- src-tauri/icons/Square44x44Logo.png
-- src-tauri/icons/Square71x71Logo.png
-- src-tauri/icons/Square89x89Logo.png
-- src-tauri/icons/StoreLogo.png
-- src-tauri/icons/icon.icns
-- src-tauri/icons/icon.ico
-- src-tauri/icons/icon.png
-- src-tauri/icons/source/README.md
-- src-tauri/icons/source/default/icon-small.svg
-- src-tauri/icons/source/default/icon.svg
-- src-tauri/icons/source/default/tray.svg
-- src-tauri/icons/tray/16.png
-- src-tauri/icons/tray/20.png
-- src-tauri/icons/tray/24.png
-- src-tauri/icons/tray/32.png
-- src-tauri/icons/tray/40.png
-- src-tauri/icons/tray/48.png
-- src-tauri/icons/tray/64.png
 - src-tauri/src/autostart.rs
 - src-tauri/src/classify.rs
 - src-tauri/src/config.rs
 - src-tauri/src/control.rs
 - src-tauri/src/devices.rs
 - src-tauri/src/elevation.rs
+- src-tauri/src/ico.rs
 - src-tauri/src/lib.rs
 - src-tauri/src/logger.rs
 - src-tauri/src/main.rs
@@ -127,7 +88,6 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - ui/icon-library.js
 - ui/icons.js
 - ui/index.html
-- ui/logo.png
 - ui/styles.css
 
 ## Log
@@ -149,13 +109,15 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - [2026-11-05T04:00:03Z] Code changed again during the run (commits 4075d9b "explicit Save for settings; custom device icons" and d903e6d "set-icons.bat; Lucide icon library"): 5 files added (set-icons.bat, tools/set-icons.ps1, tools/build-icon-library.mjs, tools/icon-library.txt, ui/icon-library.js), icon sources moved to icons/source/default/, ui/logo.svg replaced by ui/logo.png
 - [2026-11-05T04:00:03Z] Re-processed the changed and new files; all specs updated (full_documentation, api_reference, data_models, catalog, relationships, developer_guide, diagrams)
 - [2026-11-05T04:00:16Z] Verification (re-run): diagrams parsed and rendered with Mermaid 11 (4/4 OK); coverage 61 == 61; all Rust, JavaScript and PowerShell functions are in catalog.txt; 13/13 IPC commands and 3/3 events are in api_reference.md; all Settings, DeviceSettings and Device fields are documented
+- [2026-11-05T04:07:30Z] Code changed again (commit 9bda7a0 "assets folder with named icon files"): icons moved to assets/ (app_icon.ico, tray_icon.ico, header_logo.png, source/*.svg), new src-tauri/src/ico.rs, src-tauri/icons/ removed (27 files), ui/logo.png is now generated and git-ignored; specs updated and file lists regenerated (41 files)
+- [2026-11-05T04:07:30Z] Verification (re-run): coverage 41 == 41; every Rust, JavaScript and PowerShell function is in catalog.txt; 13/13 IPC commands documented; diagrams unchanged and still valid (4/4)
 
 ## Verification Summary
 
 | Check | Result |
 | --- | --- |
-| Files to Process == Files Processed | 61 == 61 |
-| File sections in full_documentation.md | 61, one per tracked file, same paths |
+| Files to Process == Files Processed | 41 == 41 |
+| File sections in full_documentation.md | 41, one per tracked file, same paths |
 | IPC commands documented | 13 / 13 |
 | Events documented | 3 / 3 |
 | Rust, JavaScript and PowerShell functions in catalog | all |
