@@ -2,15 +2,17 @@
 setlocal
 cd /d "%~dp0"
 
-rem Changes every USB Toggle icon: app window, taskbar, Start menu, tray,
-rem installer, exe and the logo in the window header.
+rem Replaces the app icons in the assets folder from a PNG or SVG image:
+rem   assets\app_icon.ico     window, taskbar, Start menu, .exe, installer
+rem   assets\tray_icon.ico    tray icon (next to the clock)
+rem   assets\header_logo.png  logo at the top of the app window
 rem
-rem   set-icons.bat                     regenerate from src-tauri\icons\source\
-rem   set-icons.bat my-icon.png         one image for everything (or drag it onto this file)
-rem   set-icons.bat app.png tray.png    a separate image for the tray
-rem   set-icons.bat --reset             back to the built-in artwork
+rem   set-icons.bat my-icon.png          one image for everything (or drag it onto this file)
+rem   set-icons.bat app.png tray.png     a separate image for the tray
+rem   set-icons.bat --reset              back to the built-in icons
+rem   set-icons.bat                      shows this help, changes nothing
 rem
-rem Images: square PNG (512x512 or larger) or SVG with a transparent background.
+rem You can also skip this and copy your own .ico files into assets\ with those names.
 rem Afterwards, run build.bat to build the app with the new icons.
 
 set "PSARGS="

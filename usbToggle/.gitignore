@@ -54,3 +54,4 @@ test-results/
 # Tauri build artifacts
 src-tauri/target/
 package-lock.json
+ui/logo.png

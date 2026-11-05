@@ -4,6 +4,7 @@ mod config;
 mod control;
 mod devices;
 mod elevation;
+mod ico;
 mod logger;
 mod notify;
 mod paths;
@@ -308,21 +309,20 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
-/// The tray uses a tile-less switch glyph, pre-rendered per size so it stays
-/// crisp instead of being scaled down by the shell.
+/// The tray icon is assets/tray_icon.ico, built into the app. The frame that
+/// matches the screen scale is used so it stays crisp instead of being scaled
+/// down by the shell.
 fn tray_icon(scale: f64) -> Option<tauri::image::Image<'static>> {
-    const ICONS: &[(u32, &[u8])] = &[
-        (16, include_bytes!("../icons/tray/16.png")),
-        (20, include_bytes!("../icons/tray/20.png")),
-        (24, include_bytes!("../icons/tray/24.png")),
-        (32, include_bytes!("../icons/tray/32.png")),
-        (40, include_bytes!("../icons/tray/40.png")),
-        (48, include_bytes!("../icons/tray/48.png")),
-        (64, include_bytes!("../icons/tray/64.png")),
-    ];
+    const TRAY_ICO: &[u8] = include_bytes!("../../assets/tray_icon.ico");
     let want = (16.0 * scale).round() as u32;
-    let (_, bytes) = ICONS.iter().find(|(size, _)| *size >= want).unwrap_or(&ICONS[ICONS.len() - 1]);
-    tauri::image::Image::from_bytes(bytes).ok()
+    let frame = ico::pick_frame(TRAY_ICO, want)?;
+    match tauri::image::Image::from_bytes(&frame) {
+        Ok(image) => Some(image),
+        Err(e) => {
+            log_error!("tray_icon.ico could not be read: {e}");
+            None
+        }
+    }
 }
 
 fn show_main(app: &AppHandle) {

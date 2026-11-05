@@ -193,17 +193,25 @@ You can start `usbToggle.exe --tray` to open it hidden in the tray.
 
 ## Change the app icon
 
-To use your own icon for the window, taskbar, tray and installer, run **`set-icons.bat`** in this
-folder with a square PNG (512×512 or larger) or SVG:
+All icons are in the **`assets`** folder, named after where they show:
+
+| File | Where it shows |
+| --- | --- |
+| `assets\app_icon.ico` | Window, **taskbar**, Start menu, the `.exe` file, the installer |
+| `assets\tray_icon.ico` | The tray icon next to the clock |
+| `assets\header_logo.png` | The logo at the top inside the app window |
+
+Replace them with your own files (**keep the names**), or let `set-icons.bat` make all three from one
+square PNG or SVG (512×512 or larger):
 
 ```bat
 set-icons.bat my-icon.png          one image for everything (you can also drag it onto the file)
 set-icons.bat app.png tray.png     a separate image for the tray
-set-icons.bat --reset              back to the default icon
+set-icons.bat --reset              back to the default icons
 ```
 
-Then run `build.bat`. If Windows still shows the old icon, unpin and re-pin the app: Windows
-caches icons. Details are in `src-tauri/icons/source/README.md`.
+Then run `build.bat`. If Windows still shows the old icon, unpin and re-pin the app: Windows caches
+icons. More in `assets\README.md`.
 
 ## Troubleshooting
 
