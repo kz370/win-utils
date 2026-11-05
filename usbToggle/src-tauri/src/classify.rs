@@ -80,6 +80,8 @@ const GENERIC_NAMES: &[&str] = &[
     "hid keyboard device",
     "hid-compliant mouse",
     "winusb device",
+    "microsoft bluetooth enumerator",
+    "microsoft bluetooth le enumerator",
     "mtp usb device",
     "disk drive",
 ];
@@ -95,6 +97,8 @@ const SKIP_FUNCTIONS: &[&str] = &[
     "generic volume",
     "volume",
     "winusb device",
+    "microsoft bluetooth enumerator",
+    "microsoft bluetooth le enumerator",
 ];
 
 fn is_generic(name: &str) -> bool {
@@ -155,6 +159,11 @@ pub fn categorize(info: &NodeInfo, functions: &[NodeInfo]) -> Category {
     );
     let hint_has = |words: &[&str]| words.iter().any(|w| hint.contains(w));
 
+    // First: a Bluetooth radio is a Bluetooth adapter even when it also
+    // carries audio interfaces or sits on a Wi-Fi combo card.
+    if has("bluetooth") || id_has("CLASS_E0&SUBCLASS_01&PROT_01") {
+        return Category::Bluetooth;
+    }
     if has("camera") || has_usb_class(&ids, "0E") || (has("image") && hint_has(&["cam"])) {
         return Category::Camera;
     }
@@ -170,9 +179,6 @@ pub fn categorize(info: &NodeInfo, functions: &[NodeInfo]) -> Category {
     }
     if has("media") || has("audioendpoint") || has_usb_class(&ids, "01") {
         return Category::Audio;
-    }
-    if has("bluetooth") || id_has("CLASS_E0&SUBCLASS_01&PROT_01") {
-        return Category::Bluetooth;
     }
     if has("net") || id_has("CLASS_E0&SUBCLASS_01&PROT_03") || id_has("CLASS_02&SUBCLASS_06") || id_has("CLASS_02&SUBCLASS_0D") {
         return Category::Network;
@@ -243,11 +249,14 @@ pub fn display_name(info: &NodeInfo, functions: &[NodeInfo], category: Category,
         Category::Storage => &["diskdrive", "cdrom"],
         Category::Camera => &["camera", "image"],
         Category::Phone => &["wpd"],
+        // Wi-Fi + Bluetooth combo cards report the Wi-Fi product name over
+        // USB ("802.11ac WLAN Adapter"); Windows' Bluetooth name is clearer.
+        Category::Bluetooth => &["bluetooth"],
         _ => &[],
     };
     let from_function = || {
-        functions
-            .iter()
+        std::iter::once(info)
+            .chain(functions.iter())
             .filter(|f| wanted_class.contains(&f.class.to_ascii_lowercase().as_str()))
             .find_map(best_of)
     };
@@ -489,6 +498,29 @@ mod tests {
         assert!(!has_usb_class(&[r"USB\CLASS_010".into()], "01"));
         assert!(has_usb_class(&[r"USB\DEVCLASS_09&SUBCLASS_00".into()], "09"));
         assert!(!has_usb_class(&[r"USB\CLASS_E0&SUBCLASS_01&PROT_01".into()], "01"));
+    }
+
+    #[test]
+    fn bluetooth_on_a_wifi_combo_card() {
+        // Realtek combo card: the USB device reports the Wi-Fi product name,
+        // has a Bluetooth radio below it, and paired headphones were once
+        // picked up as audio functions.
+        let mut dev = node("Bluetooth", "Realtek Bluetooth Adapter", &[r"USB\Class_E0&SubClass_01&Prot_01"]);
+        dev.bus_description = "802.11ac WLAN Adapter".into();
+        let enumerator = node("Bluetooth", "Microsoft Bluetooth Enumerator", &[]);
+        let headset = node("MEDIA", "Bluetooth headset", &[]);
+        let cat = categorize(&dev, &[enumerator.clone(), headset]);
+        assert_eq!(cat, Category::Bluetooth);
+        assert_eq!(display_name(&dev, &[enumerator.clone()], cat, Some("Realtek")), "Realtek Bluetooth Adapter");
+        assert_eq!(function_label(&enumerator), None);
+
+        // Composite device whose Bluetooth part is a function.
+        let mut comp = node("USB", "USB Composite Device", &[]);
+        comp.bus_description = "802.11ac WLAN Adapter".into();
+        let radio = node("Bluetooth", "Intel(R) Wireless Bluetooth(R)", &[]);
+        let cat = categorize(&comp, &[radio.clone()]);
+        assert_eq!(cat, Category::Bluetooth);
+        assert_eq!(display_name(&comp, &[radio], cat, Some("Intel")), "Intel(R) Wireless Bluetooth(R)");
     }
 
     #[test]

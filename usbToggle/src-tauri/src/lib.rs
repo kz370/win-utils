@@ -19,6 +19,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, Theme, WindowEvent};
 
 use config::{Config, Settings, Store};
+use classify::Category;
 use devices::Device;
 
 const TRAY_ID: &str = "main-tray";
@@ -82,11 +83,19 @@ struct ToggleResult {
 
 // ---------------------------------------------------------------- state ---
 
+/// Keyboards and mice are protected automatically when the setting is on.
+fn auto_lock(d: &Device, settings: &Settings) -> bool {
+    settings.protect_input && matches!(d.category, Category::Keyboard | Category::Mouse | Category::Input)
+}
+
 fn apply_config(devices: &mut [Device], cfg: &Config) {
     for d in devices.iter_mut() {
         let custom = cfg.device(&d.id);
         d.custom_name = custom.and_then(|c| c.name.clone()).filter(|n| !n.trim().is_empty());
         d.pinned = custom.map(|c| c.pinned).unwrap_or(false);
+        let auto = auto_lock(d, &cfg.settings);
+        d.locked = custom.and_then(|c| c.locked).unwrap_or(auto);
+        d.auto_locked = d.locked && auto && custom.and_then(|c| c.locked).is_none();
         d.name = d.custom_name.clone().unwrap_or_else(|| d.default_name.clone());
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then_with(|| a.id.cmp(&b.id)));
@@ -160,6 +169,16 @@ fn set_busy(app: &AppHandle, id: &str, busy: bool) {
 
 fn toggle_device(app: &AppHandle, id: &str, enable: bool) -> ToggleResult {
     let core = core(app);
+    let locked = core.devices.lock().unwrap().iter().any(|d| d.id.eq_ignore_ascii_case(id) && d.locked);
+    if locked && !enable {
+        return ToggleResult {
+            ok: false,
+            code: Some("locked"),
+            message: Some("This device is protected, so it can't be turned off. Unprotect it first.".into()),
+            needs_restart: false,
+            snapshot: snapshot(&core),
+        };
+    }
     set_busy(app, id, true);
     let result = {
         let _op = core.op_lock.lock().unwrap();
@@ -224,13 +243,24 @@ fn build_tray_menu(app: &AppHandle, snap: &Snapshot) -> tauri::Result<Menu<tauri
     } else {
         for d in pinned {
             let busy = snap.busy.iter().any(|b| b == &d.id);
+            // A protected device that is on can't be switched from here.
+            let frozen = d.locked && d.enabled;
             let mut label = d.name.replace('&', "&&");
             if busy {
                 label.push_str("  (working…)");
+            } else if frozen {
+                label.push_str("  (protected)");
             } else if !d.present {
                 label.push_str("  (not connected)");
             }
-            let item = CheckMenuItem::with_id(app, format!("{DEVICE_MENU_PREFIX}{}", d.id), label, !busy, d.enabled, None::<&str>)?;
+            let item = CheckMenuItem::with_id(
+                app,
+                format!("{DEVICE_MENU_PREFIX}{}", d.id),
+                label,
+                !busy && !frozen,
+                d.enabled,
+                None::<&str>,
+            )?;
             menu.append(&item)?;
         }
     }
@@ -396,12 +426,37 @@ async fn set_pinned(app: AppHandle, id: String, pinned: bool) -> Result<Snapshot
 }
 
 #[tauri::command]
+async fn set_locked(app: AppHandle, id: String, locked: bool) -> Result<Snapshot, String> {
+    blocking(move || {
+        let core = core(&app);
+        let auto = {
+            let cfg = core.config.lock().unwrap();
+            core.devices
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|d| d.id.eq_ignore_ascii_case(&id))
+                .map(|d| auto_lock(d, &cfg.settings))
+                .unwrap_or(false)
+        };
+        // Store only a choice that differs from the automatic rule.
+        let choice = (locked != auto).then_some(locked);
+        core.config.lock().unwrap().update_device(&id, |d| d.locked = choice);
+        save_config(&core)?;
+        Ok(reapply_config(&app))
+    })
+    .await?
+}
+
+#[tauri::command]
 async fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> {
     blocking(move || {
         let core = core(&app);
         core.config.lock().unwrap().settings = settings.clone();
         save_config(&core)?;
         apply_theme(&app, &settings.theme);
+        // Settings such as "Protect keyboards and mice" change device state.
+        reapply_config(&app);
         Ok(settings)
     })
     .await?
@@ -490,6 +545,7 @@ pub fn run() {
             set_device_enabled,
             rename_device,
             set_pinned,
+            set_locked,
             save_settings,
             set_autostart,
             restart_as_admin,

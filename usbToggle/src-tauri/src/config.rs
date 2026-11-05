@@ -28,6 +28,8 @@ pub struct Settings {
     /// Hide connected devices Windows reports a problem with (code 43, no
     /// driver, ...). Disabled devices are not "problems".
     pub hide_problems: bool,
+    /// Keyboards and mice can't be turned off unless unlocked one by one.
+    pub protect_input: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +43,7 @@ impl Default for Settings {
             ports_only: true,
             confirm_risky: true,
             hide_problems: true,
+            protect_input: true,
         }
     }
 }
@@ -52,11 +55,15 @@ pub struct DeviceSettings {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub pinned: bool,
+    /// The user's own lock choice. `None` follows the automatic rule
+    /// (`Settings::protect_input`); `Some` overrides it either way.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
 }
 
 impl DeviceSettings {
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && !self.pinned
+        self.name.is_none() && !self.pinned && self.locked.is_none()
     }
 }
 
@@ -174,6 +181,7 @@ mod tests {
         assert!(cfg.settings.ports_only, "new setting defaults to on for existing files");
         assert!(!cfg.settings.show_hubs && !cfg.settings.show_disconnected);
         assert!(cfg.settings.hide_problems, "new setting defaults to on");
+        assert!(cfg.settings.protect_input, "new setting defaults to on");
         assert!(cfg.devices.is_empty());
     }
 

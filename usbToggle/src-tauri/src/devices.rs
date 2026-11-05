@@ -47,6 +47,10 @@ pub struct Device {
     /// Names of the functions/drivers under this device (keyboard, disk, ...).
     pub functions: Vec<String>,
     pub pinned: bool,
+    /// Protected: can't be turned off (it can still be turned on).
+    pub locked: bool,
+    /// Locked by the automatic keyboard/mouse rule rather than by the user.
+    pub auto_locked: bool,
 }
 
 #[cfg(windows)]
@@ -152,6 +156,8 @@ pub(crate) fn assemble(nodes: Vec<RawNode>) -> Vec<Device> {
             last_seen: n.last_seen,
             functions: function_names,
             pinned: false,
+            locked: false,
+            auto_locked: false,
         });
     }
     out
@@ -441,8 +447,14 @@ pub(crate) mod imp {
             return;
         }
         loop {
-            out.push(cm_node_info(child));
-            descendants(child, depth + 1, out);
+            let info = cm_node_info(child);
+            // Below a Bluetooth radio Windows lists the *paired* devices
+            // (headphones, mice...). They aren't part of this USB device.
+            let is_radio = info.class.eq_ignore_ascii_case("bluetooth");
+            out.push(info);
+            if !is_radio {
+                descendants(child, depth + 1, out);
+            }
             let mut next = 0u32;
             if unsafe { CM_Get_Sibling(&mut next, child, 0) } != CR_SUCCESS || out.len() > 64 {
                 break;

@@ -75,6 +75,7 @@
     portsOnly: true,
     confirmRisky: true,
     hideProblems: true,
+    protectInput: true,
   };
 
   // ------------------------------------------------------------- state --
@@ -288,6 +289,10 @@
   async function setEnabled(id, enable, { confirm = true, undo = true } = {}) {
     const d = state.byId.get(id);
     if (!d || isBusy(d)) return;
+    if (!enable && d.locked) {
+      toast(`${d.name} is protected. Unprotect it with the lock button to turn it off.`, { kind: "info" });
+      return;
+    }
 
     if (!enable && confirm && state.settings.confirmRisky && RISKY.has(d.category) && d.present) {
       if (!(await confirmDisable(d))) return;
@@ -326,6 +331,21 @@
         store.set("pinHintShown", true);
         toast("Pinned. You can also switch it from the tray icon menu.", { kind: "info", duration: 5000 });
       }
+    } catch (e) {
+      errorToast(String(e));
+    }
+  }
+
+  async function setLocked(id, locked) {
+    try {
+      applySnapshot(await invoke("set_locked", { id, locked }));
+      const d = state.byId.get(id);
+      toast(
+        locked
+          ? `${d ? d.name : "Device"} is protected. It can't be turned off until you unprotect it.`
+          : `${d ? d.name : "Device"} is no longer protected.`,
+        { kind: "info" }
+      );
     } catch (e) {
       errorToast(String(e));
     }
@@ -459,12 +479,18 @@
     refs.tile = h("span", { class: "tile" });
     refs.label = h("span", { class: "label" });
     refs.pinMark = iconSpan("pin", "pin-mark");
+    refs.lockMark = iconSpan("lock", "lock-mark");
     refs.meta = h("span", { class: "device-meta" });
     refs.main = h(
       "button",
       { class: "device-main", type: "button", "aria-expanded": "false", onclick: () => toggleExpanded(d.id) },
       refs.tile,
-      h("span", { class: "device-text" }, h("span", { class: "device-name" }, refs.label, refs.pinMark), refs.meta)
+      h("span", { class: "device-text" }, h("span", { class: "device-name" }, refs.label, refs.pinMark, refs.lockMark), refs.meta)
+    );
+    refs.lock = h(
+      "button",
+      { class: "icon-btn lock-btn", type: "button", onclick: () => setLocked(d.id, !state.byId.get(d.id)?.locked) },
+      iconSpan("lock")
     );
     refs.pin = h(
       "button",
@@ -493,7 +519,7 @@
     const root = h(
       "article",
       { class: "device", "data-id": d.id },
-      h("div", { class: "device-row" }, refs.main, h("div", { class: "row-actions" }, refs.pin, refs.expand), refs.sw),
+      h("div", { class: "device-row" }, refs.main, h("div", { class: "row-actions" }, refs.lock, refs.pin, refs.expand), refs.sw),
       refs.details
     );
     const row = { root, refs, category: null };
@@ -519,6 +545,12 @@
     refs.label.textContent = d.name;
     refs.label.title = d.name;
     refs.pinMark.hidden = !d.pinned;
+    refs.lockMark.hidden = !d.locked;
+    refs.lockMark.title = "Protected";
+    refs.lock.setAttribute("aria-pressed", String(!!d.locked));
+    refs.lock.title = d.locked ? "Unprotect (allow turning off)" : "Protect (can't be turned off)";
+    refs.lock.setAttribute("aria-label", refs.lock.title);
+    refs.lock.replaceChildren(iconSpan(d.locked ? "lock" : "unlock"));
     refs.meta.replaceChildren(...metaParts(d, row.inPanelSection));
     refs.main.setAttribute("aria-expanded", String(expanded));
 
@@ -530,7 +562,17 @@
     refs.sw.setAttribute("aria-checked", String(on));
     refs.sw.setAttribute("aria-busy", String(busy));
     const action = `${on ? "Turn off" : "Turn on"} ${d.name}`;
-    refs.sw.title = busy ? "Working…" : on ? "On — click to turn off" : "Off — click to turn on";
+    // Protected and on: visible but frozen (turning it on stays possible).
+    const frozen = !!d.locked && on;
+    refs.sw.classList.toggle("frozen", frozen);
+    refs.sw.setAttribute("aria-disabled", String(frozen));
+    refs.sw.title = busy
+      ? "Working…"
+      : frozen
+        ? "Protected — unprotect it to turn it off"
+        : on
+          ? "On — click to turn off"
+          : "Off — click to turn on";
     refs.sw.setAttribute("aria-label", action);
 
     if (expanded) renderDetails(row, d);
@@ -641,6 +683,7 @@
     $(".facts", content).replaceChildren(
       ...fact("Status", status),
       ...fact("Type", categoryLabel(d)),
+      ...fact("Protection", protectionText(d)),
       ...fact("Windows name", d.description && d.description !== d.name ? d.description : null),
       ...fact("Manufacturer", d.vendor),
       ...fact("Hardware ID", vidPid(d), { mono: true }),
@@ -649,6 +692,14 @@
       ...fact("Includes", d.functions && d.functions.length ? d.functions.join(", ") : null),
       ...fact("Instance ID", d.id, { mono: true, copy: true })
     );
+  }
+
+  function protectionText(d) {
+    const autoRule = state.settings.protectInput && ["keyboard", "mouse", "input"].includes(d.category);
+    if (d.autoLocked) return "Protected automatically (keyboards and mice)";
+    if (d.locked) return "Protected by you";
+    if (autoRule) return "Not protected (you unprotected it)";
+    return null;
   }
 
   function connectionText(d) {
@@ -817,17 +868,20 @@
 
     // Connected devices are grouped by where the port is on the case
     // (front, back, ...). Devices behind a hub follow the hub's port.
-    const external = connected.filter((d) => !d.builtIn);
+    // Protected devices get their own group; the rest by location.
+    const protectedList = connected.filter((d) => d.locked);
+    const external = connected.filter((d) => !d.locked && !d.builtIn);
     const byPanel = PANEL_ORDER.map((p) => [p, external.filter((d) => d.panel === p)]);
     const anyPanel = byPanel.some(([, items]) => items.length);
     const unplaced = external.filter((d) => !PANEL[d.panel]);
-    const builtIn = connected.filter((d) => d.builtIn);
+    const builtIn = connected.filter((d) => !d.locked && d.builtIn);
 
     const groups = [
       ["pinned", "Pinned", pinned, false],
       ...byPanel.map(([p, items]) => [`panel-${p}`, PANEL[p], items, false]),
       ["connected", anyPanel ? "Other ports" : "Connected", unplaced, false],
       ["builtin", "Built into this PC", builtIn, false],
+      ["protected", "Protected", protectedList, false],
       ["hubs", "USB hubs", hubs, true],
       ["disconnected", "Not connected", gone, true],
     ];

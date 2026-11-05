@@ -792,8 +792,23 @@ button.section-head:hover {
   height: 16px;
 }
 
-.pin-btn[aria-pressed="true"] {
+.pin-btn[aria-pressed="true"],
+.lock-btn[aria-pressed="true"] {
   color: var(--accent);
+}
+
+.device-name .lock-mark {
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+  flex: none;
+}
+
+/* A protected device that is on: the switch is shown but can't be used. */
+.switch.frozen {
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.5;
 }
 
 .expand-btn [data-icon] {
