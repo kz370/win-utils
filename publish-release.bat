@@ -47,12 +47,14 @@ for %%F in ("release-assets\*") do echo   %%~nxF
 echo.
 
 echo Checking GitHub CLI...
-gh auth status
+gh api user --jq .login >nul 2>&1
 if errorlevel 1 (
-    echo Please login using: gh auth login
+    echo GitHub CLI not authenticated with a working account.
+    echo Please run: gh auth login -h github.com
     pause
     exit /b 1
 )
+for /f %%u in ('gh api user --jq .login') do echo Logged in as %%u
 
 echo.
 echo Pushing latest commits...
