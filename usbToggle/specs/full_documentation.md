@@ -36,7 +36,12 @@ Main capabilities:
 - Hides devices that are not working (Windows problem codes such as 43) by default.
 - Groups connected devices by the panel of the case they are plugged into (front, back, ...).
 - Optionally lists USB hubs and devices Windows remembers that are not plugged in.
-- Lets the user rename and pin devices; pinned devices also appear in the tray menu.
+- Lets the user rename and pin devices (pinned devices also appear in the tray menu) and choose an icon
+  for each device from 22 built-in icons or a searchable library of 239 Lucide icons.
+- Settings are edited in a dialog and applied only with *Save*; leaving with unsaved changes asks
+  whether to save or discard them.
+- All application icons (window, taskbar, tray, installer, header) can be replaced in one step with
+  `set-icons.bat`.
 - Updates the list automatically when devices are plugged in or removed.
 - Protects devices from being turned off: keyboards and mice automatically (setting), any other
   device with its lock button. Protected devices are grouped in a "Protected" section.
@@ -86,8 +91,9 @@ See `architecture_overview.md` for the full description and `diagrams/architectu
 | Paths | `src-tauri/src/paths.rs` | Installed vs. portable data folders |
 | Logging | `src-tauri/src/logger.rs` | Rotating log file and logging macros |
 | Win32 helpers | `src-tauri/src/win.rs` | UTF-16 conversion, last error, hidden child processes |
-| User interface | `ui/index.html`, `ui/app.js`, `ui/styles.css`, `ui/icons.js`, `ui/logo.svg` | The window |
+| User interface | `ui/index.html`, `ui/app.js`, `ui/styles.css`, `ui/icons.js`, `ui/icon-library.js`, `ui/logo.png` | The window |
 | Build | `build.bat`, `package.json` | Builds the exe, the portable ZIP and the installer |
+| Tools | `set-icons.bat`, `tools/*` | Regenerates the app icons; generates the icon library |
 | Installer | `installer/usbToggle.iss`, `installer/portable.txt` | Inno Setup script and portable marker |
 | Assets | `src-tauri/icons/**` | Application and tray icons and their SVG sources |
 
@@ -169,8 +175,8 @@ The rules below are enforced by the code. Each rule names the place that impleme
 
 | # | Rule | Implemented in |
 | --- | --- | --- |
-| P1 | Only preferences are stored: settings, custom names, pins and lock choices. On/off state is always read from Windows. | `config.rs` |
-| P2 | Per-device entries are keyed by the upper-case instance ID. Entries with no name, no pin and no lock choice are removed. | `config::Config::update_device` |
+| P1 | Only preferences are stored: settings, custom names, pins, lock choices and icons. On/off state is always read from Windows. | `config.rs` |
+| P2 | Per-device entries are keyed by the upper-case instance ID. Entries with no name, no pin, no lock choice and no icon are removed. | `config::Config::update_device` |
 | P3 | Saving writes `config.json.tmp` and renames it over `config.json`. | `config::Store::save` |
 | P4 | A missing file means defaults with no message. An unreadable file means defaults with a message. A damaged file is copied to `config.<yyyyMMdd-HHmmss>.bak.json` and replaced by defaults, with a message. A file from a newer schema is not overwritten at load time; defaults are used with a message. | `config::Store::load` |
 | P5 | Files with schema version below 3 have *Only devices on USB ports* set to on and *Show USB hubs* and *Show disconnected devices* set to off, once; everything else is kept. | `config::Store::load` |
@@ -183,7 +189,16 @@ The rules below are enforced by the code. Each rule names the place that impleme
 | P12 | A second launch of the app shows the existing window instead of starting another instance. | `tauri-plugin-single-instance` in `lib::run` |
 | P13 | *Restart as admin* starts the same executable with the `runas` verb and `--wait-for-pid <current pid>` (plus `--tray` if the window was hidden), then exits. The new process waits up to 5 seconds for the old one to exit. | `elevation.rs`, `lib::restart_as_admin` |
 | P14 | The window is shown only after the page reports its first paint (`ui_ready`), and only on the first report. If the page has not reported within 4 seconds of setup, the window is shown anyway (unless starting hidden). | `lib::ui_ready`, `lib::run` |
+| P16 | Changes made in the Settings dialog are kept in a draft and applied only by *Save* (or Ctrl+S); this includes *Start with Windows*. The theme is previewed immediately. Closing the dialog (close button, *Cancel*, Esc, click outside) with unsaved changes opens a "Save your changes?" dialog with *Discard* and *Save*; Esc or a click outside that dialog returns to Settings. *Discard* restores the saved theme. Actions outside the dialog ("Show them" notes, "Don't ask again") still save immediately. | `ui/app.js: openSettings, settingsDirty, saveDraft, discardDraft, requestCloseSettings` |
 | P15 | The log file is renamed to `usbToggle.old.log` when it grows past 1 MB (the previous `.old.log` is replaced). | `logger.rs` |
+
+### 4.8 Icons
+
+| # | Rule | Implemented in |
+| --- | --- | --- |
+| I1 | `set-icons.bat` regenerates every application icon from images in `src-tauri/icons/source/`: your `icon.png`/`icon.svg` (PNG first), else the built-in `default/icon.svg`. The tray uses `tray.*`, else your app image, else `default/tray.svg`. The 16/20/24 px frames of `icon.ico` use `icon-small.*`, else your app image, else `default/icon-small.svg`. A single image given on the command line replaces the custom tray and small images, so it is used everywhere; `--reset` removes all custom images. | `tools/set-icons.ps1` |
+| I2 | Each device may have a custom icon (`customIcon`). When it is not set or not a known icon name, the icon of the detected category is used ("Auto"). Icon names must match `[a-z0-9-]{1,32}`; others are rejected by the back end. | `lib::set_icon`, `ui/app.js: iconKey` |
+| I3 | Library icons are identified as `l-<lucide name>` and take the color of their group. Built-in icons take precedence when names collide. | `ui/icon-library.js`, `ui/icons.js`, `ui/app.js: colorOf` |
 
 ### 4.7 Tray
 
@@ -254,11 +269,18 @@ Windows calls the `CM_Register_Notification` callback → the callback sends on 
 debounce thread waits for 350 ms of quiet → `refresh()`. If registration fails, the thread polls
 every 4 seconds instead.
 
-### 6.5 Renaming, pinning and protecting
+### 6.5 Renaming, pinning, protecting and choosing an icon
 
-Window invokes `rename_device` / `set_pinned` / `set_locked` → configuration updated and saved →
+Window invokes `rename_device` / `set_pinned` / `set_locked` / `set_icon` → configuration updated and saved →
 `reapply_config()` (no hardware rescan) → `publish()`. Pinning also adds the device to the tray
 menu.
+
+### 6.7 Changing settings
+
+*Settings* opens the dialog with a copy of the current settings (the draft). Switches and the theme picker
+change only the draft (the theme is previewed). *Save* calls `save_settings` and, when *Start with Windows*
+changed, `set_autostart`; on success the dialog closes with a "Settings saved" toast. Leaving with unsaved
+changes asks to *Save* or *Discard*.
 
 ### 6.6 Restart as administrator
 
@@ -384,7 +406,8 @@ npm manifest that provides the Tauri CLI. Build layer.
 
 ### Summary
 Private package `usb-toggle` 1.1.0. Scripts: `tauri` (raw CLI), `dev` (`tauri dev`), `build`
-(`tauri build`). Dev dependency: `@tauri-apps/cli` `^2`.
+(`tauri build`), `icons:library` (regenerates `ui/icon-library.js`). Dev dependencies: `@tauri-apps/cli`
+`^2`, `lucide-static` `1.68.0`.
 
 ### Technical Details
 There is no JavaScript build step; the front end is served as-is from `ui/`. `package-lock.json` is ignored.
@@ -394,6 +417,97 @@ None.
 
 ### Dependencies
 `@tauri-apps/cli`.
+
+## File: /set-icons.bat
+
+### Purpose
+One-step tool for changing every application icon. Build/tooling layer.
+
+### Summary
+Usage: `set-icons.bat` (regenerate from the source folder), `set-icons.bat image.png` (one image for
+everything; an image can also be dropped onto the file), `set-icons.bat app.png tray.png` (separate tray
+image), `set-icons.bat --reset` (back to the built-in artwork). Pauses at the end so the result stays
+visible when started by double-click or drag-and-drop.
+
+### Technical Details
+Builds the argument list for `tools/set-icons.ps1` (`-AppImage`, `-TrayImage` or `-Reset`) only for
+arguments that are present, then runs it with `powershell -NoProfile -ExecutionPolicy Bypass -File`.
+Exit code 1 on failure. CRLF line endings.
+
+### Business Logic
+Implements rule I1 (see section 4.8).
+
+### Dependencies
+`tools/set-icons.ps1`, Windows PowerShell.
+
+## File: /tools/set-icons.ps1
+
+### Purpose
+Regenerates all icon files from one or two square PNG or SVG images. Build/tooling layer.
+
+### Summary
+Outputs `src-tauri/icons/icon.ico` (frames 16, 20, 24, 32, 40, 48, 64, 128, 256 px), the rest of the Tauri
+icon set (`32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.png`, `icon.icns`, `Square*Logo.png`,
+`StoreLogo.png`), `src-tauri/icons/tray/<16..64>.png` and `ui/logo.png` (256 px).
+
+### Technical Details
+- Parameters: `-AppImage`, `-TrayImage`, `-Reset`.
+- `Import-Image` validates the extension (PNG/SVG), that a PNG is square (warning below 256 px), and copies the
+  image into `src-tauri/icons/source/` as `icon.*` or `tray.*`, replacing an earlier custom file.
+- Source lookup: `source/icon.png|svg`, else `source/default/icon.svg`; tray: `source/tray.*`, else the custom
+  app image, else `default/tray.svg`; small frames: `source/icon-small.*`, else the custom app image, else
+  `default/icon-small.svg`.
+- `Invoke-TauriIcon` runs `npx tauri icon <image> -o <dir> [-p <size> ...]` (installs the CLI with
+  `npm install` on first use) to rasterize the images into a temporary folder.
+- `Write-Ico` writes a multi-size ICO whose frames are PNG images (ICONDIR + 16-byte ICONDIRENTRY records,
+  width/height 0 for 256 px).
+- The temporary folder is always removed. Errors stop the script with a readable message.
+
+### Business Logic
+Implements rule I1.
+
+### Dependencies
+Windows PowerShell 5.1+, `System.Drawing`, Node.js/npm, `@tauri-apps/cli`; `src-tauri/icons/source/**`.
+
+## File: /tools/build-icon-library.mjs
+
+### Purpose
+Generates `ui/icon-library.js` from the pick list and the `lucide-static` package. Build/tooling layer.
+
+### Summary
+Run with `npm run icons:library`. Reads `tools/icon-library.txt`, loads each listed icon's SVG and search
+tags from `lucide-static`, and writes a self-contained script with the icon bodies, keywords, groups and the
+Lucide license. Warns about names that do not exist in the installed Lucide version.
+
+### Technical Details
+Node.js ES module. Group lines are `## Label | color`; `#` lines are comments; other lines are icon names.
+SVG bodies are whitespace-collapsed; keywords are limited to printable ASCII and 120 characters. Duplicate
+names are skipped.
+
+### Business Logic
+Implements rule I3.
+
+### Dependencies
+Node.js, `lucide-static` (dev dependency, pinned), `tools/icon-library.txt`.
+
+## File: /tools/icon-library.txt
+
+### Purpose
+The curated list of library icons offered in the device icon picker.
+
+### Summary
+16 groups (Input, Audio, Video and displays, Storage, Phones and computers, Connections, Power, Office,
+Lights and climate, Security, Vehicles and health, Tools, Labels and shapes, People and places, Status,
+Tech) with 239 Lucide icon names. Each group names a category color used for its icons.
+
+### Technical Details
+Plain text; format described in its header.
+
+### Business Logic
+Defines the contents of the icon library (rule I3).
+
+### Dependencies
+Read by `tools/build-icon-library.mjs`.
 
 ## File: /installer/usbToggle.iss
 
@@ -598,7 +712,7 @@ Application layer.
 
 ### Summary
 - Holds the shared state `Core` (behind `Arc`, registered with Tauri's state manager).
-- Exposes 12 IPC commands to the window (see `api_reference.md`).
+- Exposes 13 IPC commands to the window (see `api_reference.md`).
 - Emits three events: `devices` (snapshot), `busy` (IDs with an operation in progress), `toast`
   (messages for tray-initiated failures).
 - Builds and updates the tray icon, menu and tooltip.
@@ -612,7 +726,7 @@ Application layer.
 - **IPC payloads:** `Snapshot`, `AppInfo`, `ToggleResult` (serde, camelCase).
 - **State functions:**
   - `auto_lock(device, settings)` — the automatic protection rule (keyboards and mice).
-  - `apply_config(devices, cfg)` — applies custom names, pins and protection, then sorts by name and ID.
+  - `apply_config(devices, cfg)` — applies custom names, pins, protection and icons, then sorts by name and ID.
   - `snapshot(core)` — copies the current list, sorted busy IDs, scan time and scan error.
   - `refresh(app)` — scans under `scan_lock`, applies the config, stores the result (or the error), sets the
     scan time and `scanned`, then `publish`.
@@ -625,7 +739,7 @@ Application layer.
   `refresh`, `dev:<instance id>`), `tray_icon(scale)` (embedded PNGs from `icons/tray/`).
 - **Window:** `show_main` (unminimize, show, focus), `toggle_main`, `apply_theme` (`light`/`dark`/system).
 - **Commands:** `get_info`, `get_devices`, `set_device_enabled`, `rename_device`, `set_pinned`,
-  `set_locked`, `save_settings` (also re-applies device state), `set_autostart`, `restart_as_admin`, `ui_ready`, `open_folder`, `quit`. Commands that touch
+  `set_locked`, `set_icon` (validates the icon name), `save_settings` (also re-applies device state), `set_autostart`, `restart_as_admin`, `ui_ready`, `open_folder`, `quit`. Commands that touch
   Windows or disk are `async` and run through `blocking()` (`spawn_blocking`).
 - **`run()`:** logger init → `wait_for_previous_instance` → load config → detect elevation → decide
   start-hidden → build `Core` → Tauri builder (single-instance plugin, state, handlers) → `setup` (create
@@ -637,7 +751,7 @@ Application layer.
   are released before any Tauri call that dispatches to the main thread.
 
 ### Business Logic
-Implements rules D12, N5, S0–S3, S6, S9, P8, P11–P14 and T1–T4.
+Implements rules D12, N5, S0–S3, S6, S9, P8, P11–P14, I2 and T1–T4.
 
 ### Dependencies
 `autostart`, `classify` (via `devices`), `config`, `control`, `devices`, `elevation`, `logger`, `notify`,
@@ -757,7 +871,7 @@ atomically. `Config::device()` and `Config::update_device()` read and change per
 
 ### Technical Details
 - **Types:** `Settings` (theme, closeToTray, startMinimized, showDisconnected, showHubs, portsOnly,
-  confirmRisky, hideProblems, protectInput), `DeviceSettings` (name, pinned, locked), `Config` (schemaVersion, settings, devices map), `Store`
+  confirmRisky, hideProblems, protectInput), `DeviceSettings` (name, pinned, locked, icon), `Config` (schemaVersion, settings, devices map), `Store`
   (path). All serde camelCase with `default`.
 - **Constant:** `SCHEMA_VERSION = 3`.
 - **Load:** not found → defaults; read error → defaults + message; parse OK and schema ≤ 3 → migrate (schema
@@ -920,11 +1034,13 @@ the configuration notice, the toolbar (search field with clear button and Ctrl F
 the device list container, the toast area, the confirmation dialog and the Settings dialog.
 
 ### Technical Details
-- Loads `styles.css`, then `icons.js` and `app.js` with `defer`. No inline scripts.
+- Loads `styles.css`, then `icons.js`, `icon-library.js` and `app.js` with `defer`. No inline scripts.
+- The Settings dialog has a fixed footer (`#settings-dirty`, `#settings-cancel`, `#settings-save`); the
+  `#unsaved` dialog asks to *Discard* or *Save*.
 - Elements referenced by ID from `app.js`: `summary`, `refresh`, `open-settings`, `banner`, `elevate`,
   `notice`, `search`, `search-clear`, `filter`, `list`, `toasts`, `confirm`, `confirm-title`,
   `confirm-text`, `confirm-dont-ask`, `confirm-ok`, `settings`, `theme`, `autostart`, `autostart-desc`,
-  `version`, `quit`.
+  `settings-dirty`, `settings-cancel`, `settings-save`, `unsaved`, `unsaved-save`, `version`, `quit`.
 - Settings switches use `data-setting` (`portsOnly`, `showDisconnected`, `showHubs`, `hideProblems`,
   `protectInput`, `confirmRisky`, `closeToTray`, `startMinimized`); folder buttons use `data-open-folder` (`config`, `logs`).
 - Settings dialog layout: a fixed title bar (`.dialog-bar` with the close button) and a scrolling body
@@ -936,7 +1052,7 @@ the device list container, the toast area, the confirmation dialog and the Setti
 Settings texts describe rules V2–V4b, S8, P9 and P11.
 
 ### Dependencies
-`styles.css`, `icons.js`, `app.js`, `logo.svg`.
+`styles.css`, `icons.js`, `icon-library.js`, `app.js`, `logo.png`.
 
 ## File: /ui/app.js
 
@@ -952,7 +1068,8 @@ administrator restart, keyboard shortcuts and toasts. Reacts to back-end events.
 ### Technical Details
 - Wrapped in an IIFE in strict mode. If `window.__TAURI__` is missing, it shows a message and stops.
 - **Bridge:** `invoke(cmd, args)` → `__TAURI__.core.invoke`; `listen(name, cb)` → `__TAURI__.event.listen`.
-- **Constants:** `CATEGORY` (labels), `PANEL` and `PANEL_ORDER`, `RISKY` (keyboard, mouse, input, hub,
+- **Constants:** `CATEGORY` (labels), `ICON_CHOICES` (22 built-in picker icons), `ICON_COLOR` (colors of the
+  extra built-in icons), `PANEL` and `PANEL_ORDER`, `RISKY` (keyboard, mouse, input, hub,
   bluetooth), `PROBLEMS` (readable text for 21 Device Manager problem codes), `DEFAULT_SETTINGS`.
 - **State object:** `loaded`, `devices`, `byId`, `busy` (from the back end), `pending` (ID → requested
   state, optimistic), `scannedAt`, `scanError`, `info`, `settings`, `filter`, `query`, `expanded`,
@@ -967,16 +1084,19 @@ administrator restart, keyboard shortcuts and toasts. Reacts to back-end events.
 - **Data intake:** `applySnapshot`, `applyInfo`, `applyTheme`, `saveSettings` (optimistic, rolled back on
   error).
 - **Actions:** `refresh` (minimum 450 ms spinner), `setEnabled` (refuses to turn off a protected device),
-  `setLocked`, `setPinned` (one-time hint about the tray),
+  `setLocked`, `setIcon`, `setPinned` (one-time hint about the tray),
   `rename`, `restartAsAdmin`, `copy` (Clipboard API with a `textarea` fallback), `confirmDisable`.
 - **Rendering:** keyed and incremental. `rows` maps device ID → row elements; `sections` maps section key →
   section elements; `reconcile(container, nodes)` inserts, moves and removes nodes without rebuilding
   focused elements. Functions: `matches`, `passesFilter`, `metaParts`, `createRow`, `updateRow`, `fact`,
-  `renderDetails` (rename field, problem note, facts list), `protectionText`, `connectionText`, `toggleExpanded`,
+  `renderDetails` (rename field, icon picker, problem note, facts list), `renderIconPicker`, `iconButton`,
+  `buildIconLibrary` (searchable library panel, built on first open), `protectionText`, `connectionText`, `toggleExpanded`,
   `getSection`, `getHiddenNote` (one note per hiding setting), `describeHidden`, `skeleton`, `emptyState`, `renderSummary`, `render`.
 - **Filter/search:** `setFilter`, `setQuery`.
-- **Settings:** `syncSettingsDialog` (switch states, autostart description, disables *Start in the tray*
-  when autostart is off), `setAutostart`, `openSettings`.
+- **Settings (draft):** `openSettings` (copies the settings into `draft`), `settingsDirty`,
+  `syncSettingsDialog` (switches, autostart description, *Start in the tray* availability, Save button and
+  "Unsaved changes" note), `saveDraft`, `discardDraft`, `requestCloseSettings` (opens `#unsaved` when dirty).
+- **Icons:** `autoIconKey`, `knownIcon`, `iconKey`, `colorOf`, `iconLabel`.
 - **Wiring (`bind`):** buttons, search input and clear button, filter, settings controls, dialogs (backdrop
   click closes), keyboard shortcuts (Ctrl+F or `/` focus search; F5 or Ctrl+R refresh without reloading;
   Ctrl+P/S/U/G/J blocked; Escape clears search or collapses details), context menu blocked except in text
@@ -986,10 +1106,11 @@ administrator restart, keyboard shortcuts and toasts. Reacts to back-end events.
   `get_devices(force=false)`.
 
 ### Business Logic
-Implements rules S0 (display), S3 (display), S8, S10 and V1–V9 (including V4b), and the window side of flows 6.1, 6.3, 6.5 and 6.6.
+Implements rules S0 (display), S3 (display), S8, S10, P16, I2, I3 and V1–V9 (including V4b), and the window side of flows 6.1, 6.3, 6.5 and 6.6.
 
 ### Dependencies
-`window.__TAURI__` (global API enabled by `withGlobalTauri`), `icons.js` (`window.icon`), `index.html`
+`window.__TAURI__` (global API enabled by `withGlobalTauri`), `icons.js` (`window.icon`), `icon-library.js`
+(`window.ICON_LIBRARY`), `index.html`
 element IDs, back-end commands and events (see `api_reference.md`).
 
 ## File: /ui/styles.css
@@ -1026,12 +1147,14 @@ None (presentation only).
 Inline SVG icon set. Presentation layer.
 
 ### Summary
-Exposes `window.ICONS` (name → SVG markup) and `window.icon(name)` (falls back to the USB icon).
+Exposes `window.ICONS` (name → SVG markup) and `window.icon(name)`, which returns a built-in icon, else a
+library icon (`l-<name>` from `icon-library.js`), else the USB icon.
 
 ### Technical Details
 24×24 line icons drawn with `currentColor`, stroke width 1.8. Device icons: `usb`, `keyboard`, `mouse`,
 `input`, `gamepad`, `audio`, `camera`, `storage`, `phone`, `bluetooth`, `network`, `printer`, `serial`,
-`security`, `hub`, `other` (alias of `usb`). Interface icons: `refresh`, `settings`, `search`, `pin`,
+`security`, `hub`, `other` (alias of `usb`); extra picker icons `mic`, `speaker`, `monitor`, `pen`, `card`,
+`light`, `fan`. Interface icons: `refresh`, `settings`, `search`, `pin`,
 `chevron`, `lock`, `unlock`, `shield`, `copy`, `x`, `alert`, `check`, `info`, `unplugged`.
 
 ### Business Logic
@@ -1040,23 +1163,43 @@ Device icon names match the `Category` values serialized by the back end.
 ### Dependencies
 None. Used by `app.js` and by `data-icon` attributes in `index.html`.
 
-## File: /ui/logo.svg
+## File: /ui/icon-library.js
+
+### Purpose
+Library of extra icons for the device icon picker. Presentation layer (generated).
+
+### Summary
+Exposes `window.ICON_LIBRARY` with `groups` (label, color, icons with key, name and keywords), `count`
+(239), `has(key)`, `svg(key)` and `color(key)`. Keys are `l-<lucide name>`.
+
+### Technical Details
+Generated by `tools/build-icon-library.mjs`; do not edit by hand. Contains the Lucide license (ISC, with the
+Feather MIT notice) in its header comment. Icon bodies are wrapped in the same SVG element as the built-in
+icons (24×24, stroke width 1.8), so both sets look alike. About 73 KB.
+
+### Business Logic
+Implements rule I3.
+
+### Dependencies
+Loaded by `index.html` after `icons.js`; used by `icons.js` (`window.icon`) and `app.js` (picker).
+
+## File: /ui/logo.png
 
 ### Purpose
 The app logo shown in the window header.
 
 ### Summary
-Same artwork as the application icon (`src-tauri/icons/source/icon.svg`): a dark rounded tile with a blue
-on/off switch whose knob carries the USB mark.
+256×256 PNG of the application icon (dark rounded tile with a blue on/off switch whose knob carries the
+USB mark), displayed at 40 px.
 
 ### Technical Details
-SVG with gradients, a blur filter for the glow and a drop shadow for the knob; viewBox 100×100.
+Generated by `set-icons.bat` from the app image (by default `src-tauri/icons/source/default/icon.svg`).
 
 ### Business Logic
 None.
 
 ### Dependencies
-Referenced by `index.html`.
+Referenced by `index.html`; written by `tools/set-icons.ps1`.
 
 ## 9.5 Assets (icons)
 
@@ -1120,7 +1263,7 @@ Windows application icon: embedded in `usbToggle.exe` by `tauri-build`, used for
 Static asset; no executable behavior.
 
 ### Technical Details
-Multi-resolution ICO with frames 16, 20, 24, 32, 40, 48, 64, 128, 256 px. The 16, 20 and 24 px frames are rendered from `source/icon-small.svg` (no USB mark, no "on" bar) so the icon stays clean at small sizes; the larger frames come from `source/icon.svg`.
+Multi-resolution ICO with frames 16, 20, 24, 32, 40, 48, 64, 128, 256 px. The 16, 20 and 24 px frames are rendered from `source/default/icon-small.svg` (no USB mark, no "on" bar) unless custom images are used so the icon stays clean at small sizes; the larger frames come from the app image (`source/default/icon.svg` by default). Written by `tools/set-icons.ps1`.
 
 ### Business Logic
 None.
@@ -1341,7 +1484,7 @@ Tray icon glyph pre-rendered at 16×16 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 16×16 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 16×16 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1358,7 +1501,7 @@ Tray icon glyph pre-rendered at 20×20 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 20×20 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 20×20 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1375,7 +1518,7 @@ Tray icon glyph pre-rendered at 24×24 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 24×24 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 24×24 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1392,7 +1535,7 @@ Tray icon glyph pre-rendered at 32×32 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 32×32 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 32×32 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1409,7 +1552,7 @@ Tray icon glyph pre-rendered at 40×40 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 40×40 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 40×40 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1426,7 +1569,7 @@ Tray icon glyph pre-rendered at 48×48 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 48×48 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 48×48 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1443,7 +1586,7 @@ Tray icon glyph pre-rendered at 64×64 px.
 Static asset; no executable behavior.
 
 ### Technical Details
-PNG 64×64 px with transparency, rendered from `source/tray.svg` (the switch without the tile). Embedded into the binary with `include_bytes!`.
+PNG 64×64 px with transparency, rendered from `source/default/tray.svg` (the switch without the tile) or a custom tray image by `tools/set-icons.ps1`. Embedded into the binary with `include_bytes!`.
 
 ### Business Logic
 None.
@@ -1451,7 +1594,7 @@ None.
 ### Dependencies
 `lib.rs` (`tray_icon`).
 
-## File: /src-tauri/icons/source/icon.svg
+## File: /src-tauri/icons/source/default/icon.svg
 
 ### Purpose
 Editable source of the application icon.
@@ -1460,7 +1603,7 @@ Editable source of the application icon.
 Static asset; no executable behavior.
 
 ### Technical Details
-SVG, viewBox 100×100: dark gradient tile with a subtle edge, glowing blue switch track with a shine, an "on" bar, and a white knob with a drop shadow carrying the blue USB mark. Identical to `ui/logo.svg`.
+SVG, viewBox 100×100: dark gradient tile with a subtle edge, glowing blue switch track with a shine, an "on" bar, and a white knob with a drop shadow carrying the blue USB mark. Rendered to `ui/logo.png`.
 
 ### Business Logic
 None.
@@ -1468,7 +1611,7 @@ None.
 ### Dependencies
 Source for `icon.png`, the ≥32 px frames of `icon.ico` and the PNG icons.
 
-## File: /src-tauri/icons/source/icon-small.svg
+## File: /src-tauri/icons/source/default/icon-small.svg
 
 ### Purpose
 Simplified icon for small sizes.
@@ -1485,7 +1628,7 @@ None.
 ### Dependencies
 Source for the 16/20/24 px frames of `icon.ico`.
 
-## File: /src-tauri/icons/source/tray.svg
+## File: /src-tauri/icons/source/default/tray.svg
 
 ### Purpose
 Editable source of the tray glyph.
@@ -1505,13 +1648,13 @@ Source for `icons/tray/*.png`.
 ## File: /src-tauri/icons/source/README.md
 
 ### Purpose
-Explains the icon sources and how to regenerate the icon set.
+Explains how to change the icons with `set-icons.bat` and where the sources live.
 
 ### Summary
 Static asset; no executable behavior.
 
 ### Technical Details
-Markdown. Steps: render `icon.svg` to 1024 px, run `npx tauri icon`, rebuild `icon.ico` with small frames from `icon-small.svg`, render the tray PNGs from `tray.svg`.
+Markdown. Explains `set-icons.bat`, the custom-image file names in `source/` and the built-in artwork in `source/default/`.
 
 ### Business Logic
 None.

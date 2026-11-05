@@ -61,6 +61,7 @@ classDiagram
         +bool pinned
         +bool locked
         +bool auto_locked
+        +Option~String~ custom_icon
     }
     class RawNode {
         +String instance_id
@@ -126,6 +127,7 @@ classDiagram
         +Option~String~ name
         +bool pinned
         +Option~bool~ locked
+        +Option~String~ icon
         +is_empty() bool
     }
     class Store {

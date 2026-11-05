@@ -10,6 +10,7 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - installer/portable.txt
 - installer/usbToggle.iss
 - package.json
+- set-icons.bat
 - src-tauri/.gitignore
 - src-tauri/Cargo.lock
 - src-tauri/Cargo.toml
@@ -32,9 +33,9 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/icons/icon.ico
 - src-tauri/icons/icon.png
 - src-tauri/icons/source/README.md
-- src-tauri/icons/source/icon-small.svg
-- src-tauri/icons/source/icon.svg
-- src-tauri/icons/source/tray.svg
+- src-tauri/icons/source/default/icon-small.svg
+- src-tauri/icons/source/default/icon.svg
+- src-tauri/icons/source/default/tray.svg
 - src-tauri/icons/tray/16.png
 - src-tauri/icons/tray/20.png
 - src-tauri/icons/tray/24.png
@@ -55,10 +56,14 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/src/paths.rs
 - src-tauri/src/win.rs
 - src-tauri/tauri.conf.json
+- tools/build-icon-library.mjs
+- tools/icon-library.txt
+- tools/set-icons.ps1
 - ui/app.js
+- ui/icon-library.js
 - ui/icons.js
 - ui/index.html
-- ui/logo.svg
+- ui/logo.png
 - ui/styles.css
 
 ## Files Processed
@@ -69,6 +74,7 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - installer/portable.txt
 - installer/usbToggle.iss
 - package.json
+- set-icons.bat
 - src-tauri/.gitignore
 - src-tauri/Cargo.lock
 - src-tauri/Cargo.toml
@@ -91,9 +97,9 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/icons/icon.ico
 - src-tauri/icons/icon.png
 - src-tauri/icons/source/README.md
-- src-tauri/icons/source/icon-small.svg
-- src-tauri/icons/source/icon.svg
-- src-tauri/icons/source/tray.svg
+- src-tauri/icons/source/default/icon-small.svg
+- src-tauri/icons/source/default/icon.svg
+- src-tauri/icons/source/default/tray.svg
 - src-tauri/icons/tray/16.png
 - src-tauri/icons/tray/20.png
 - src-tauri/icons/tray/24.png
@@ -114,10 +120,14 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - src-tauri/src/paths.rs
 - src-tauri/src/win.rs
 - src-tauri/tauri.conf.json
+- tools/build-icon-library.mjs
+- tools/icon-library.txt
+- tools/set-icons.ps1
 - ui/app.js
+- ui/icon-library.js
 - ui/icons.js
 - ui/index.html
-- ui/logo.svg
+- ui/logo.png
 - ui/styles.css
 
 ## Log
@@ -136,17 +146,19 @@ Tracking file for the usbToggle documentation run. Paths are relative to `usbTog
 - [2026-11-05T03:45:35Z] Verification: coverage check passed - 56 "## File:" sections in full_documentation.md, identical to the 56 tracked files
 - [2026-11-05T03:45:35Z] Verification: consistency check passed - every Rust function and every app.js function is in catalog.txt; 12/12 IPC commands and 3/3 events are in api_reference.md; every Settings field and Device field is in api_reference.md and data_models.txt
 - [2026-11-05T03:45:35Z] Verification: English review completed (no placeholders, no duplicated words)
+- [2026-11-05T04:00:03Z] Code changed again during the run (commits 4075d9b "explicit Save for settings; custom device icons" and d903e6d "set-icons.bat; Lucide icon library"): 5 files added (set-icons.bat, tools/set-icons.ps1, tools/build-icon-library.mjs, tools/icon-library.txt, ui/icon-library.js), icon sources moved to icons/source/default/, ui/logo.svg replaced by ui/logo.png
+- [2026-11-05T04:00:03Z] Re-processed the changed and new files; all specs updated (full_documentation, api_reference, data_models, catalog, relationships, developer_guide, diagrams)
+- [2026-11-05T04:00:16Z] Verification (re-run): diagrams parsed and rendered with Mermaid 11 (4/4 OK); coverage 61 == 61; all Rust, JavaScript and PowerShell functions are in catalog.txt; 13/13 IPC commands and 3/3 events are in api_reference.md; all Settings, DeviceSettings and Device fields are documented
 
 ## Verification Summary
 
 | Check | Result |
 | --- | --- |
-| Files to Process == Files Processed | 56 == 56 |
-| File sections in full_documentation.md | 56, one per tracked file, same paths |
-| IPC commands documented | 12 / 12 |
+| Files to Process == Files Processed | 61 == 61 |
+| File sections in full_documentation.md | 61, one per tracked file, same paths |
+| IPC commands documented | 13 / 13 |
 | Events documented | 3 / 3 |
-| Rust functions in catalog | all |
-| Front-end functions in catalog | all |
+| Rust, JavaScript and PowerShell functions in catalog | all |
 | Mermaid diagrams valid | 4 / 4 |
 
 Note: the files in specs/ are the output of this run and are not part of the processed set.

@@ -50,6 +50,7 @@ One physical USB device. Produced by `devices::assemble()` and `lib::apply_confi
 | `pinned` | boolean | Pinned by the user (top of the list and tray menu). |
 | `locked` | boolean | Protected: cannot be turned off (can still be turned on). |
 | `autoLocked` | boolean | Protected by the *Protect keyboards and mice* rule rather than by the user. |
+| `customIcon` | string \| null | Icon chosen by the user (a built-in icon name such as `mic`, or `l-<name>` from the icon library). `null` means the icon of the detected `category`. |
 
 ### 1.2 `Snapshot`
 
@@ -232,7 +233,27 @@ Protects or unprotects a device.
 await invoke("set_locked", { id, locked: true }); // can't be turned off any more
 ```
 
-### 2.7 `save_settings`
+### 2.7 `set_icon`
+
+Sets or clears a device's custom icon.
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `id` | string | Device instance ID. |
+| `icon` | string \| null | Icon name, or `null` (or empty) to use the automatic icon. Must match `[a-z0-9-]{1,32}`. |
+
+| | |
+| --- | --- |
+| Returns | `Snapshot` (no hardware rescan) |
+| Side effects | Saves `config.json`; emits `devices`. |
+| Errors | Rejects with `Unknown icon "<name>".` for an invalid name, or with the save error message. The back end checks only the name format; the window falls back to the automatic icon for names it does not know. |
+
+```js
+await invoke("set_icon", { id, icon: "l-guitar" });
+await invoke("set_icon", { id, icon: null }); // back to the detected type's icon
+```
+
+### 2.8 `save_settings`
 
 Replaces all settings.
 
@@ -244,13 +265,14 @@ Replaces all settings.
 | --- | --- |
 | Returns | `Settings` (as saved) |
 | Side effects | Saves `config.json`; applies the theme to the native window frame; re-applies device state (protection) and emits `devices`. Display settings are applied by the window itself. |
+| Called when | The user presses *Save* (or Ctrl+S) in Settings, or uses an action outside the dialog that saves immediately ("Show them" notes, "Don't ask again"). Toggling a switch inside Settings does **not** call it. |
 | Errors | Rejects with the save error message. |
 
 ```js
 await invoke("save_settings", { settings: { ...current, showHubs: true } });
 ```
 
-### 2.8 `set_autostart`
+### 2.9 `set_autostart`
 
 Turns "Start with Windows" on or off.
 
@@ -261,10 +283,10 @@ Turns "Start with Windows" on or off.
 | | |
 | --- | --- |
 | Returns | `AutostartState` after the change |
-| Behavior | Elevated process: creates the logon task `usbToggle` (highest privileges) and removes the Run value. Non-elevated: writes the Run value. Off: removes both. |
+| Behavior | Called by the window when *Save* is pressed in Settings and *Start with Windows* changed. Elevated process: creates the logon task `usbToggle` (highest privileges) and removes the Run value. Non-elevated: writes the Run value. Off: removes both. |
 | Errors | Rejects with a message, e.g. "Couldn't create the startup task: …" or "Couldn't remove the startup task. Run USB Toggle as administrator to change this." |
 
-### 2.9 `restart_as_admin`
+### 2.10 `restart_as_admin`
 
 Starts an elevated copy of the app and exits this one.
 
@@ -276,7 +298,7 @@ Starts an elevated copy of the app and exits this one.
 | Errors | Rejects with "Administrator permission was not granted." when the prompt is declined or fails. |
 | Notes | Runs on the main thread; the window is unresponsive while the UAC prompt is open. |
 
-### 2.10 `ui_ready`
+### 2.11 `ui_ready`
 
 Tells the back end that the page has painted its first frame.
 
@@ -286,7 +308,7 @@ Tells the back end that the page has painted its first frame.
 | Returns | nothing |
 | Behavior | The first call shows the window unless the app was started hidden. Later calls do nothing. |
 
-### 2.11 `open_folder`
+### 2.12 `open_folder`
 
 Opens a data folder in Explorer.
 
@@ -299,7 +321,7 @@ Opens a data folder in Explorer.
 | Returns | nothing |
 | Errors | "Unknown folder" for other values; the OS error if Explorer cannot be started. |
 
-### 2.12 `quit`
+### 2.13 `quit`
 
 Exits the application (window and tray).
 
@@ -317,7 +339,7 @@ Exits the application (window and tray).
 | | |
 | --- | --- |
 | Payload | `Snapshot` |
-| When | After every scan (startup, refresh, device change, after a switch), after a rename, pin, unpin, protect or unprotect, and after settings are saved. |
+| When | After every scan (startup, refresh, device change, after a switch), after a rename, pin, unpin, protect, unprotect or icon change, and after settings are saved. |
 | Window behavior | Replaces the device list and re-renders. |
 
 ### 3.2 `busy`

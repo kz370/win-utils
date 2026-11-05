@@ -34,6 +34,7 @@ functions      Vec<String>            readable names of functions below the devi
 pinned         bool                   pinned by the user
 locked         bool                   protected: cannot be turned off (can be turned on)
 autoLocked     bool                   protected by the keyboard/mouse rule, not by the user
+customIcon     Option<String>         icon chosen by the user ("mic", "l-guitar", ...); null = category icon
 Invariants: id is unique in a list; name is never empty; hubId is never a root hub or a built-in hub;
 problem is 0 when present is false; functions is empty when isHub is true.
 
@@ -112,7 +113,8 @@ DeviceSettings
 name              Option<String>   omitted when null
 pinned            bool             omitted when false
 locked            Option<bool>     omitted when null; null = follow protectInput, true/false = user override
-An entry with no name, pinned=false and no lock choice is removed.
+icon              Option<String>   omitted when null; icon name from ui/icons.js or "l-<lucide name>"
+An entry with no name, pinned=false, no lock choice and no icon is removed.
 
 Example:
 {
@@ -129,7 +131,7 @@ Example:
     "protectInput": true
   },
   "devices": {
-    "USB\\VID_046D&PID_0825\\ABC123": { "name": "Desk webcam", "pinned": true, "locked": true },
+    "USB\\VID_046D&PID_0825\\ABC123": { "name": "Desk webcam", "pinned": true, "locked": true, "icon": "l-video" },
     "USB\\VID_1532&PID_0084\\7&1": { "locked": false }
   }
 }
@@ -140,8 +142,8 @@ v1  Original Tauri prototype (devices stored as an array). Does not match the cu
     treated as damaged: backed up to config.<timestamp>.bak.json and replaced by defaults.
 v2  Current shape without portsOnly; showHubs/showDisconnected defaulted to true.
 v3  Adds portsOnly. Loading v1/v2 sets portsOnly=true, showHubs=false, showDisconnected=false once.
-    Later added within v3: hideProblems, protectInput and devices.<id>.locked (missing in older v3
-    files, so they take their defaults).
+    Later added within v3: hideProblems, protectInput, devices.<id>.locked and devices.<id>.icon (missing in
+    older v3 files, so they take their defaults).
 >3  Not supported: defaults are used and a message is shown; the file is left as is until the next save.
 Damaged JSON: copied to config.<yyyyMMdd-HHmmss>.bak.json, defaults used, message shown.
 
@@ -238,10 +240,26 @@ state.expanded     Set<string>          rows with open details
 state.collapsed    { disconnected: boolean, hubs: boolean }
 state.refreshing   boolean
 
+Settings dialog draft (module variable "draft" in ui/app.js; null while the dialog is closed)
+draft.settings     Settings            working copy; applied only by Save
+draft.autostart    boolean             wanted "Start with Windows" state; applied only by Save
+Dirty = any draft.settings field differs from state.settings, or draft.autostart differs from
+state.info.autostart.enabled.
+
 localStorage keys (prefix "usbToggle.")
 theme          "system" | "light" | "dark"   avoids a theme flash before AppInfo arrives
 collapsed      { disconnected, hubs }        collapsed sections
 pinHintShown   boolean                       the "pinned" tray hint was shown once
+
+==============================================================================
+5b. ICON KEYS (ui/icons.js, ui/icon-library.js)
+==============================================================================
+Built-in keys     usb, keyboard, mouse, input, gamepad, audio, camera, storage, phone, bluetooth, network,
+                  printer, serial, security, hub, other (= the Category values), plus mic, speaker, monitor,
+                  pen, card, light, fan. The picker's quick row offers 22 of them (ICON_CHOICES).
+Library keys      "l-<lucide name>", e.g. "l-guitar"; 239 icons in 16 groups (ICON_LIBRARY.groups).
+Color             Category icons use their category color (cat-<category>); extra built-in icons borrow one
+                  (ICON_COLOR); library icons use the color of their group.
 
 ==============================================================================
 6. COMMAND-LINE AND STARTUP ENTRIES

@@ -43,6 +43,10 @@ lib::rename_device | calls | config::Config::update_device
 lib::rename_device | calls | config::Store::save
 lib::set_pinned | calls | config::Config::update_device
 lib::set_pinned | calls | config::Store::save
+lib::set_locked | calls | config::Config::update_device
+lib::set_icon | calls | lib::valid_icon_name
+lib::set_icon | calls | config::Config::update_device
+lib::set_icon | calls | config::Store::save
 lib::save_settings | calls | config::Store::save
 lib::save_settings | calls | lib::apply_theme
 lib::set_autostart | calls | autostart::set
@@ -92,15 +96,20 @@ paths::portable_dir | reads | portable.txt (existence)
 # Front end
 ui/index.html | uses | ui/styles.css
 ui/index.html | uses | ui/icons.js
+ui/index.html | uses | ui/icon-library.js
 ui/index.html | uses | ui/app.js
-ui/index.html | uses | ui/logo.svg
+ui/index.html | uses | ui/logo.png
 ui/app.js | depends_on | window.__TAURI__ (withGlobalTauri)
 ui/app.js | uses | ui/icons.js (window.icon)
+ui/app.js | uses | ui/icon-library.js (window.ICON_LIBRARY)
+ui/icons.js | uses | ui/icon-library.js (library icons by key "l-<name>")
 ui/app.js | invokes | command:get_info
 ui/app.js | invokes | command:get_devices
 ui/app.js | invokes | command:set_device_enabled
 ui/app.js | invokes | command:rename_device
 ui/app.js | invokes | command:set_pinned
+ui/app.js | invokes | command:set_locked
+ui/app.js | invokes | command:set_icon
 ui/app.js | invokes | command:save_settings
 ui/app.js | invokes | command:set_autostart
 ui/app.js | invokes | command:restart_as_admin
@@ -136,6 +145,12 @@ installer/usbToggle.iss | uses | taskkill.exe, schtasks.exe, reg.exe
 installer/usbToggle.iss | reads | WebView2 registration (EdgeUpdate client key)
 
 # Assets
-icons/source/icon.svg | builds | icons/*.png, icons/icon.ico (32 px and up), icons/icon.icns, ui/logo.svg
-icons/source/icon-small.svg | builds | icons/icon.ico (16, 20, 24 px frames)
-icons/source/tray.svg | builds | icons/tray/*.png
+set-icons.bat | calls | tools/set-icons.ps1
+tools/set-icons.ps1 | uses | npx tauri icon (Tauri CLI, rasterizes PNG and SVG)
+tools/set-icons.ps1 | reads | icons/source/icon.png|svg, tray.png|svg, icon-small.png|svg (your images)
+tools/set-icons.ps1 | reads | icons/source/default/icon.svg, tray.svg, icon-small.svg (built-in artwork)
+tools/set-icons.ps1 | writes | icons/icon.ico, icons/*.png, icons/icon.icns, icons/tray/*.png, ui/logo.png
+tools/build-icon-library.mjs | reads | tools/icon-library.txt
+tools/build-icon-library.mjs | reads | lucide-static (icons, tags, license)
+tools/build-icon-library.mjs | writes | ui/icon-library.js
+package.json | depends_on | lucide-static (dev), @tauri-apps/cli (dev)

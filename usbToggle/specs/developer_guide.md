@@ -154,6 +154,12 @@ do not depend on Tauri or Win32).
 - Toggle *Only devices on USB ports*, *Show USB hubs*, *Show disconnected devices*,
   *Hide devices that aren't working* (a device with code 43 disappears and is named in a note).
 - Rename, reset the name, pin and unpin; restart the app and check they persist.
+- Choose an icon in a device's details (quick row, then *More icons* with search); *Auto* goes back to the
+  detected icon. Restart and check the choice persists.
+- Settings: toggling a switch changes nothing until *Save*; × / Esc / click outside with changes shows
+  *Discard* / *Save*; *Discard* restores the previous theme; Ctrl+S saves.
+- Run `set-icons.bat` with a test PNG, then `build.bat`: the exe, installer, taskbar, tray and header logo all
+  show the new icon; `set-icons.bat --reset` restores the default.
 - Enable *Start with Windows* as admin; sign out and in; the app starts in the tray without UAC.
 - Close the window (hides to tray), *Quit* from the tray, launch twice (focuses the first window).
 - Damage `config.json`: the app starts with defaults, shows a notice and leaves a `.bak.json`.
@@ -240,10 +246,34 @@ Add the VID (four upper-case hex digits) and company name to `vendor_name()` in 
 Emit with `app.emit("name", payload)` (payload `Serialize`), listen in `init()` in `ui/app.js` with
 `listen("name", handler)`, and document it.
 
-### 6.6 Change the icons
+### 6.6 Change the application icons
 
-Edit the SVGs in `src-tauri/icons/source/` and follow `src-tauri/icons/source/README.md`. Keep the
-16–24 px frames of `icon.ico` on the simplified artwork and re-render `icons/tray/*.png`.
+Run `set-icons.bat` in the `usbToggle` folder (or drag an image onto it):
+
+```bat
+set-icons.bat my-icon.png          one image for everything
+set-icons.bat app.png tray.png     a separate tray image
+set-icons.bat --reset              back to the built-in artwork
+```
+
+Images must be square PNG (512×512 or larger) or SVG with a transparent background. The script copies them
+into `src-tauri/icons/source/` (`icon.*`, `tray.*`, optionally `icon-small.*` for the 16/20/24 px frames) and
+regenerates `icon.ico`, the rest of the Tauri icon set, `icons/tray/<size>.png` and `ui/logo.png`. The built-in
+artwork lives in `src-tauri/icons/source/default/`. Rebuild with `build.bat` afterwards. If Windows still shows
+the old icon on the taskbar or desktop, unpin and re-pin the app (Windows caches icons).
+
+### 6.7 Add or change library icons
+
+Edit `tools/icon-library.txt` (`## Label | color` starts a group, followed by Lucide icon names from
+https://lucide.dev/icons) and run:
+
+```bat
+npm install
+npm run icons:library
+```
+
+This rewrites `ui/icon-library.js`. Names that do not exist in the installed Lucide version are reported and
+skipped. Keep the Lucide license notice in the generated header.
 
 ## 7. Style rules
 

@@ -23,6 +23,7 @@ logger              [module]  (src-tauri/src/logger.rs)      - Rotating file log
 win                 [module]  (src-tauri/src/win.rs)         - UTF-16 helpers, last error, console-less commands.
 app.js              [module]  (ui/app.js)                    - Front-end state, rendering, interactions and IPC calls.
 icons.js            [module]  (ui/icons.js)                  - Inline SVG icon set (window.ICONS, window.icon).
+icon-library.js     [module]  (ui/icon-library.js)           - Generated Lucide icon library: 239 icons, groups, keywords (window.ICON_LIBRARY).
 
 ------------------------------------------------------------------------------
 TYPES (Rust)
@@ -41,7 +42,7 @@ Category            [enum]    (classify.rs)   - Device type: keyboard, mouse, in
 ActionError         [struct]  (control.rs)    - Error code + readable message of an enable/disable call.
 ActionOutcome       [struct]  (control.rs)    - Successful enable/disable result (needs_restart).
 Settings            [struct]  (config.rs)     - User settings (theme, tray, startup, display filters incl. hideProblems, protection, confirmation).
-DeviceSettings      [struct]  (config.rs)     - Per-device custom name, pin and lock override.
+DeviceSettings      [struct]  (config.rs)     - Per-device custom name, pin, lock override and icon.
 Config              [struct]  (config.rs)     - Root of config.json: schema version, settings, device map.
 Store               [struct]  (config.rs)     - Location of config.json; load and save.
 AutostartState      [struct]  (autostart.rs)  - Whether the app starts with Windows and whether elevated.
@@ -74,7 +75,7 @@ main                        (main.rs)       - Calls usb_toggle_lib::run().
 run                         (lib.rs)        - Starts the app: logger, config, elevation, Tauri builder, setup, event loop.
 core                        (lib.rs)        - Returns the shared Core from an AppHandle.
 auto_lock                   (lib.rs)        - Automatic protection rule (keyboards and mice when protectInput is on).
-apply_config                (lib.rs)        - Applies custom names, pins and protection, then sorts devices.
+apply_config                (lib.rs)        - Applies custom names, pins, protection and icons, then sorts devices.
 snapshot                    (lib.rs)        - Builds a Snapshot from Core.
 refresh                     (lib.rs)        - Rescans devices, stores the result, publishes it.
 reapply_config              (lib.rs)        - Re-applies names/pins/protection without rescanning, publishes.
@@ -96,6 +97,8 @@ set_device_enabled          (lib.rs)        - [command] Turns a device on or off
 rename_device               (lib.rs)        - [command] Sets or clears a custom name.
 set_pinned                  (lib.rs)        - [command] Pins or unpins a device.
 set_locked                  (lib.rs)        - [command] Protects or unprotects a device.
+set_icon                    (lib.rs)        - [command] Sets or clears a device's custom icon (validates the name).
+valid_icon_name             (lib.rs)        - True for icon names matching [a-z0-9-]{1,32}.
 save_settings               (lib.rs)        - [command] Saves settings, applies the theme, re-applies device state.
 set_autostart               (lib.rs)        - [command] Turns "Start with Windows" on or off.
 restart_as_admin            (lib.rs)        - [command] Relaunches elevated and exits.
@@ -213,11 +216,12 @@ toast, errorToast           - Notifications (with optional action button).
 applySnapshot               - Stores a Snapshot and re-renders.
 applyTheme                  - Sets data-theme and caches the theme.
 applyInfo                   - Stores AppInfo, settings, banner, version, notice.
-saveSettings                - Optimistic settings save with rollback.
+saveSettings                - Immediate settings save with rollback (outside the Settings dialog and from Save).
 refresh                     - Forced rescan with spinner.
 setEnabled                  - Switch flow: confirmation, pending, invoke, toasts, Undo.
 setPinned, rename           - Pin and rename actions.
 setLocked                   - Protect / unprotect action with a confirmation toast.
+setIcon                     - Sets or clears a device's custom icon.
 restartAsAdmin              - Invokes restart_as_admin.
 copy                        - Copies text to the clipboard.
 confirmDisable              - Confirmation dialog for risky devices.
@@ -226,7 +230,7 @@ matches, passesFilter       - Search and All/On/Off filter predicates.
 metaParts                   - Secondary line of a row (status, type, vendor, panel, hub/port).
 createRow, updateRow        - Create and update a device row in place.
 fact                        - One label/value pair in the details list.
-renderDetails               - Details panel (rename, problem note, facts).
+renderDetails               - Details panel (rename, icon picker, problem note, facts).
 protectionText              - "Protected automatically / by you / Not protected (you unprotected it)".
 connectionText              - "USB port 3 on this PC (front panel)" style text.
 toggleExpanded              - Opens/closes a row's details.
@@ -238,8 +242,18 @@ skeleton, emptyState        - Loading and empty views.
 renderSummary               - Header summary ("8 connected · 1 off").
 render                      - Builds the grouped, filtered list.
 setFilter, setQuery         - Filter and search state.
-syncSettingsDialog          - Synchronizes Settings controls with state.
-setAutostart, openSettings  - Settings actions.
+autoIconKey, knownIcon, iconKey, colorOf, iconLabel
+                            - Icon selection helpers: automatic icon, validity, effective icon, color, label.
+iconButton                  - One icon button of the picker.
+renderIconPicker            - Builds the picker (Auto + quick icons + library panel) for a device.
+buildIconLibrary            - Searchable, grouped library panel, built on first open.
+ICON_CHOICES, ICON_COLOR    - Quick-row icons (22) and colors of the extra built-in icons.
+settingsDirty               - True when the Settings draft differs from the saved settings or autostart state.
+syncSettingsDialog          - Synchronizes Settings controls, Save button and "Unsaved changes" with the draft.
+saveDraft                   - Saves the draft (settings, then autostart) and closes Settings on success.
+discardDraft                - Drops the draft, restores the saved theme, closes Settings.
+requestCloseSettings        - Closes Settings, or asks Discard / Save when there are unsaved changes.
+openSettings                - Opens Settings with a draft copy of the current settings.
 bind                        - Wires all event handlers and shortcuts.
 init                        - Startup sequence of the page.
 
@@ -262,13 +276,20 @@ UI COMPONENTS (ui/index.html + ui/styles.css)
 .empty / .skeleton          - Empty and loading states.
 #toasts / .toast            - Notifications with optional action.
 #confirm (.dialog)          - Confirmation dialog for risky devices.
-#settings (.dialog-scroll)  - Settings dialog with fixed title bar and scrolling body.
+#settings (.dialog-scroll)  - Settings dialog: fixed title bar and footer (Cancel, Save, "Unsaved changes"), scrolling body.
+#unsaved (.dialog)          - "Save your changes?" dialog with Discard and Save.
+.icon-picker                - Icon picker in the details panel (.icon-quick, .icon-library, .icon-search, .icon-grid).
 .setting                    - One settings row (title, description, switch).
 
 ------------------------------------------------------------------------------
 BUILD AND DEPLOYMENT COMPONENTS
 ------------------------------------------------------------------------------
 build.bat                   - Builds exe, portable folder + ZIP, and the Inno installer into dist\.
+set-icons.bat               - Regenerates all app icons from one or two images (or --reset); runs tools/set-icons.ps1.
+tools/set-icons.ps1         - Builds icon.ico, the Tauri icon set, tray PNGs and ui/logo.png from PNG/SVG sources.
+  Say, Import-Image, Find-Custom, Remove-Custom, Invoke-TauriIcon, Write-Ico  [ps1] - Helpers of set-icons.ps1.
+tools/build-icon-library.mjs - Generates ui/icon-library.js from tools/icon-library.txt and lucide-static.
+tools/icon-library.txt      - The list of library icons and their groups.
 installer/usbToggle.iss     - Inno Setup script (install, WebView2 check, clean uninstall).
 installer/portable.txt      - Portable-mode marker shipped in the ZIP.
 HasWebView2 [iss]           - Checks the WebView2 runtime registration.

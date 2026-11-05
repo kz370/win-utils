@@ -4,11 +4,11 @@ flowchart TB
         HTML["index.html<br/>structure and dialogs"]
         APP["app.js<br/>state, rendering, actions"]
         CSS["styles.css<br/>light and dark themes"]
-        ICONS["icons.js<br/>SVG icon set"]
+        ICONS["icons.js, icon-library.js<br/>SVG icons (22 built-in + 239 Lucide)"]
     end
 
     subgraph CORE["Application core - src-tauri/src/lib.rs"]
-        CMDS["IPC commands<br/>get_info, get_devices, set_device_enabled,<br/>rename_device, set_pinned, set_locked,<br/>save_settings, set_autostart, restart_as_admin, ui_ready,<br/>open_folder, quit"]
+        CMDS["IPC commands<br/>get_info, get_devices, set_device_enabled,<br/>rename_device, set_pinned, set_locked,<br/>set_icon, save_settings, set_autostart, restart_as_admin, ui_ready,<br/>open_folder, quit"]
         STATE["Core state<br/>devices, config, busy set,<br/>scan_lock, op_lock"]
         EVENTS["Events<br/>devices, busy, toast"]
         TRAY["Tray icon and menu"]
