@@ -100,5 +100,11 @@
   icons.other = icons.usb;
 
   window.ICONS = icons;
-  window.icon = (name) => icons[name] || icons.usb;
+  // Built-in icons first, then the Lucide library ("l-<name>", icon-library.js).
+  window.icon = (name) => {
+    if (icons[name]) return icons[name];
+    const lib = window.ICON_LIBRARY;
+    if (lib && lib.has(name)) return lib.svg(name);
+    return icons.usb;
+  };
 })();

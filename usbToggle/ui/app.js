@@ -66,8 +66,16 @@
   ];
   const ICON_COLOR = { mic: "audio", speaker: "audio", monitor: "input", pen: "input", card: "storage", light: "gamepad", fan: "network" };
   const autoIconKey = (d) => (d.category in CATEGORY ? d.category : "other");
-  const iconKey = (d) => (d.customIcon && window.ICONS && window.ICONS[d.customIcon] ? d.customIcon : autoIconKey(d));
-  const colorOf = (key) => ICON_COLOR[key] || key;
+  const knownIcon = (key) => !!key && (!!window.ICONS[key] || !!(window.ICON_LIBRARY && window.ICON_LIBRARY.has(key)));
+  const iconKey = (d) => (knownIcon(d.customIcon) ? d.customIcon : autoIconKey(d));
+  const colorOf = (key) =>
+    ICON_COLOR[key] || (window.ICON_LIBRARY && window.ICON_LIBRARY.has(key) ? window.ICON_LIBRARY.color(key) : key);
+  const iconLabel = (key) => {
+    const builtIn = ICON_CHOICES.find(([k]) => k === key);
+    if (builtIn) return builtIn[1];
+    const name = key.startsWith("l-") ? key.slice(2) : key;
+    return name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " ");
+  };
 
   const RISKY = new Set(["keyboard", "mouse", "input", "hub", "bluetooth"]);
 
@@ -690,7 +698,7 @@
         save.disabled = typed === (cur?.customName || "") || (!cur?.customName && !typed);
         reset.hidden = !cur?.customName;
       };
-      const picker = h("div", { class: "icon-picker", role: "radiogroup", "aria-label": "Icon" });
+      const picker = h("div", { class: "icon-picker", role: "group", "aria-label": "Icon" });
       content = h(
         "div",
         { class: "details-content" },
@@ -743,29 +751,123 @@
     );
   }
 
+  function iconButton(key, label, onPick, extraClass = "") {
+    return h(
+      "button",
+      {
+        class: `icon-choice cat-${colorOf(key)} ${extraClass}`.trim(),
+        type: "button",
+        title: label,
+        "aria-label": label,
+        "data-key": key,
+        onclick: onPick,
+      },
+      iconSpan(key)
+    );
+  }
+
+  // Quick row (Auto + common icons) and an expandable, searchable library.
   function renderIconPicker(picker, d) {
     const auto = autoIconKey(d);
-    const current = d.customIcon && window.ICONS[d.customIcon] ? d.customIcon : null;
-    // Rebuild only when the device's detected type or choice changed.
+    const current = knownIcon(d.customIcon) ? d.customIcon : null;
     const stamp = `${auto}|${current}`;
     if (picker.dataset.stamp === stamp) return;
     picker.dataset.stamp = stamp;
-    const choice = (key, label, isAuto) =>
-      h(
-        "button",
-        {
-          class: "icon-choice cat-" + colorOf(key) + (isAuto ? " auto" : ""),
-          type: "button",
-          role: "radio",
-          title: isAuto ? `Automatic (${CATEGORY[auto] || "USB device"})` : label,
-          "aria-label": isAuto ? "Automatic icon" : label,
-          "aria-pressed": String(isAuto ? !current : current === key),
-          onclick: () => setIcon(d.id, isAuto ? null : key),
-        },
-        iconSpan(key),
-        isAuto ? "Auto" : null
-      );
-    picker.replaceChildren(choice(auto, "Auto", true), ...ICON_CHOICES.map(([key, label]) => choice(key, label, false)));
+
+    const autoBtn = iconButton(auto, `Automatic (${CATEGORY[auto] || "USB device"})`, () => setIcon(d.id, null), "auto");
+    autoBtn.append("Auto");
+    autoBtn.setAttribute("aria-pressed", String(!current));
+
+    const quickKeys = ICON_CHOICES.map(([k]) => k);
+    if (current && !quickKeys.includes(current)) quickKeys.unshift(current); // keep a library pick visible
+    const quick = quickKeys.map((key) => {
+      const b = iconButton(key, iconLabel(key), () => setIcon(d.id, key));
+      b.setAttribute("aria-pressed", String(current === key));
+      return b;
+    });
+
+    if (!picker._library) picker._library = buildIconLibrary(d.id);
+    picker._library.sync(current);
+    picker.replaceChildren(h("div", { class: "icon-quick" }, autoBtn, ...quick), picker._library.root);
+  }
+
+  function buildIconLibrary(id) {
+    const lib = window.ICON_LIBRARY;
+    const root = h("div", { class: "icon-more" });
+    if (!lib) return { root, sync() {} };
+
+    const toggle = h("button", { class: "link-btn more-toggle", type: "button", "aria-expanded": "false" });
+    const search = h("input", {
+      class: "icon-search",
+      type: "text",
+      placeholder: `Search ${lib.count} icons`,
+      "aria-label": "Search icons",
+      spellcheck: "false",
+      autocomplete: "off",
+    });
+    const empty = h("p", { class: "icon-empty", text: "No icons match.", hidden: true });
+    const list = h("div", { class: "icon-groups" });
+    const panel = h("div", { class: "icon-library", hidden: true }, search, list, empty);
+    const buttons = [];
+    let selected = null;
+
+    const build = () => {
+      for (const g of lib.groups) {
+        const grid = h("div", { class: "icon-grid" });
+        for (const ic of g.icons) {
+          const b = iconButton(ic.key, iconLabel(ic.key), () => setIcon(id, ic.key));
+          b.dataset.search = `${ic.name.replace(/-/g, " ")} ${ic.keywords} ${g.label}`.toLowerCase();
+          b.setAttribute("aria-pressed", String(selected === ic.key));
+          buttons.push(b);
+          grid.append(b);
+        }
+        list.append(h("div", { class: "icon-group" }, h("p", { class: "icon-group-label", text: g.label }), grid));
+      }
+    };
+
+    const filter = () => {
+      const terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      let shown = 0;
+      for (const b of buttons) {
+        const ok = terms.every((t) => b.dataset.search.includes(t));
+        b.hidden = !ok;
+        if (ok) shown++;
+      }
+      for (const g of list.children) g.hidden = !g.querySelector(".icon-choice:not([hidden])");
+      empty.hidden = shown > 0;
+    };
+
+    const setOpen = (open) => {
+      if (open && !buttons.length) build();
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.textContent = open ? "Fewer icons" : `More icons (${lib.count})`;
+      if (open) search.focus();
+    };
+
+    toggle.addEventListener("click", () => setOpen(panel.hidden));
+    search.addEventListener("input", filter);
+    search.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && search.value) {
+        e.preventDefault();
+        e.stopPropagation();
+        search.value = "";
+        filter();
+      } else if (e.key === "Enter") {
+        const first = buttons.find((b) => !b.hidden);
+        if (first) first.click();
+      }
+    });
+    setOpen(false);
+    root.append(toggle, panel);
+
+    return {
+      root,
+      sync(current) {
+        selected = current;
+        for (const b of buttons) b.setAttribute("aria-pressed", String(b.dataset.key === current));
+      },
+    };
   }
 
   function protectionText(d) {

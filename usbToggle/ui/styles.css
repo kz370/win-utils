@@ -990,10 +990,72 @@ button.section-head:hover {
 }
 
 .icon-picker {
+  margin-bottom: 12px;
+}
+
+.icon-quick,
+.icon-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 12px;
+}
+
+.more-toggle {
+  margin-top: 6px;
+  padding-left: 2px;
+}
+
+.icon-library {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.icon-search {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+.icon-search:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.icon-groups {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.icon-group + .icon-group {
+  margin-top: 6px;
+}
+
+.icon-group-label {
+  margin: 4px 0 4px 2px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.icon-empty {
+  margin: 8px 2px;
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
 .icon-choice {

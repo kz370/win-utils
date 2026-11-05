@@ -1,0 +1,37 @@
+# Icons offered in the device icon picker (ui/icon-library.js).
+# "## Group label | color" starts a group; the color is a category color from styles.css.
+# Then Lucide icon names (https://lucide.dev/icons), separated by spaces.
+# Regenerate with:  npm run icons:library
+
+## Input | input
+keyboard keyboard-music mouse mouse-pointer mouse-pointer-2 gamepad gamepad-2 joystick pen-tool pencil pen-line touchpad touchpad-off hand pointer fingerprint scan-face
+## Audio | audio
+headphones headset ear mic mic-vocal mic-off speaker volume-2 volume-x radio audio-lines audio-waveform music music-2 music-4 disc-3 piano guitar drum
+## Video and displays | camera
+webcam camera camera-off video video-off cctv monitor monitor-speaker monitor-smartphone monitor-play monitor-off tv tv-minimal projector presentation screen-share aperture film clapperboard
+## Storage | storage
+hard-drive hard-drive-download hard-drive-upload save database server server-cog disc disc-2 album memory-stick cassette-tape archive folder folder-open package box
+## Phones and computers | phone
+smartphone smartphone-charging tablet tablet-smartphone laptop laptop-minimal computer pc-case watch cpu microchip circuit-board
+## Connections | network
+usb cable plug plug-zap plug-2 unplug bluetooth bluetooth-connected bluetooth-searching bluetooth-off wifi wifi-off wifi-high router network ethernet-port satellite-dish antenna signal radio-tower radio-receiver nfc rss
+## Power | gamepad
+battery battery-charging battery-full battery-low battery-medium battery-warning power power-off zap zap-off bolt
+## Office | printer
+printer file-text receipt sticker stamp ticket notebook book-open
+## Lights and climate | gamepad
+lightbulb lightbulb-off lamp lamp-desk lamp-floor flashlight sun moon sparkles palette rainbow fan wind air-vent thermometer snowflake flame
+## Security | security
+key key-round key-square lock lock-open shield shield-check shield-alert fingerprint scan scan-line qr-code id-card badge-check
+## Vehicles and health | bluetooth
+car gauge drone rocket plane bike tractor heart-pulse activity stethoscope syringe pill microscope telescope binoculars
+## Tools | other
+wrench hammer settings settings-2 cog sliders-horizontal toolbox drill ruler
+## Labels and shapes | input
+star heart bookmark flag tag tags pin map-pin circle square triangle hexagon diamond crown trophy gift coffee cup-soda beer
+## People and places | phone
+user users baby dog cat bird fish house building building-2 briefcase school gamepad-2
+## Status | other
+circle-check circle-x circle-alert circle-help ban eye eye-off bell bell-off bell-ring clock timer alarm-clock calendar
+## Tech | network
+bot brain code terminal hash at-sign globe cloud cloud-off download upload refresh-cw rotate-cw infinity
