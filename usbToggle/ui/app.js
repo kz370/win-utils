@@ -27,6 +27,17 @@
     other: "USB device",
   };
 
+  // Where the port is on the case (from the motherboard firmware).
+  const PANEL = {
+    front: "Front panel",
+    back: "Back panel",
+    left: "Left side",
+    right: "Right side",
+    top: "Top",
+    bottom: "Bottom",
+  };
+  const panelLabel = (d) => (d.panel && PANEL[d.panel]) || null;
+
   const RISKY = new Set(["keyboard", "mouse", "input", "hub", "bluetooth"]);
 
   // Device Manager problem codes, phrased for people.
@@ -58,8 +69,8 @@
     theme: "system",
     closeToTray: true,
     startMinimized: true,
-    showDisconnected: true,
-    showHubs: true,
+    showDisconnected: false,
+    showHubs: false,
     portsOnly: true,
     confirmRisky: true,
   };
@@ -226,7 +237,7 @@
     state.settings = { ...DEFAULT_SETTINGS, ...(info.settings || {}) };
     applyTheme(state.settings.theme);
     $("#banner").hidden = !!info.elevated;
-    $("#version").textContent = info.version ? `v${info.version}` : "";
+    $("#version").textContent = info.version ? `v${info.version}${info.portable ? " (portable)" : ""}` : "";
     syncSettingsDialog();
     const notice = $("#notice");
     notice.hidden = !info.configError;
@@ -387,7 +398,7 @@
 
   function matches(d, q) {
     if (!q) return true;
-    const hay = [d.name, d.defaultName, d.description, d.vendor, categoryLabel(d), vidPid(d), d.id, d.hubName, ...(d.functions || [])]
+    const hay = [d.name, d.defaultName, d.description, d.vendor, categoryLabel(d), vidPid(d), d.id, d.hubName, panelLabel(d), ...(d.functions || [])]
       .filter(Boolean)
       .join("\n")
       .toLowerCase();
@@ -422,6 +433,7 @@
     if (d.vendor && !d.name.toLowerCase().includes(d.vendor.split(" ")[0].toLowerCase())) parts.push(d.vendor);
     if (d.builtIn) parts.push(h("span", { class: "built-in-tag", text: "Built-in" }));
     else if (d.present) {
+      if (panelLabel(d)) parts.push(panelLabel(d));
       if (d.hubName) parts.push(`via ${d.hubName}`);
       else if (d.port) parts.push(`Port ${d.port}`);
     }
@@ -639,8 +651,10 @@
     if (d.builtIn) return "Built into this PC (internal USB)";
     if (!d.present) return null;
     const port = d.port ? `port ${d.port}` : null;
-    if (d.hubName) return `USB hub “${d.hubName}”${port ? `, ${port}` : ""}`;
-    return port ? `USB ${port} on this PC` : "USB port on this PC";
+    const side = panelLabel(d);
+    const where = side ? ` (${side.toLowerCase()})` : "";
+    if (d.hubName) return `USB hub “${d.hubName}”${port ? `, ${port}` : ""}${where}`;
+    return (port ? `USB ${port} on this PC` : "USB port on this PC") + where;
   }
 
   function toggleExpanded(id) {

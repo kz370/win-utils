@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -33,8 +33,8 @@ impl Default for Settings {
             theme: "system".into(),
             close_to_tray: true,
             start_minimized: true,
-            show_disconnected: true,
-            show_hubs: true,
+            show_disconnected: false,
+            show_hubs: false,
             ports_only: true,
             confirm_risky: true,
         }
@@ -92,8 +92,7 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Self {
-        let base = std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-        Self { path: base.join("usbToggle").join("config.json") }
+        Self { path: crate::paths::config_dir().join("config.json") }
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -110,6 +109,14 @@ impl Store {
         };
         match serde_json::from_str::<Config>(&text) {
             Ok(mut cfg) if cfg.schema_version <= SCHEMA_VERSION => {
+                if cfg.schema_version < 3 {
+                    // v3 changed what the list shows by default: only devices
+                    // on real USB ports, no hubs, no disconnected devices.
+                    let d = Settings::default();
+                    cfg.settings.ports_only = d.ports_only;
+                    cfg.settings.show_hubs = d.show_hubs;
+                    cfg.settings.show_disconnected = d.show_disconnected;
+                }
                 cfg.schema_version = SCHEMA_VERSION;
                 (cfg, None)
             }
@@ -161,7 +168,30 @@ mod tests {
         assert_eq!(cfg.settings.theme, "dark");
         assert!(cfg.settings.close_to_tray);
         assert!(cfg.settings.ports_only, "new setting defaults to on for existing files");
+        assert!(!cfg.settings.show_hubs && !cfg.settings.show_disconnected);
         assert!(cfg.devices.is_empty());
+    }
+
+    #[test]
+    fn v2_files_get_the_new_list_defaults_once() {
+        let dir = std::env::temp_dir().join(format!("usbtoggle-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store { path: dir.join("config.json") };
+        std::fs::write(
+            store.path(),
+            r#"{"schemaVersion":2,"settings":{"theme":"dark","showHubs":true,"showDisconnected":true,"portsOnly":false}}"#,
+        )
+        .unwrap();
+        let (mut cfg, err) = store.load();
+        assert!(err.is_none());
+        assert_eq!(cfg.settings.theme, "dark", "unrelated settings are kept");
+        assert!(cfg.settings.ports_only && !cfg.settings.show_hubs && !cfg.settings.show_disconnected);
+
+        // After saving as v3, the user's own choices stick.
+        cfg.settings.show_hubs = true;
+        store.save(&cfg).unwrap();
+        assert!(store.load().0.settings.show_hubs);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -305,6 +305,27 @@ pub fn parse_vid_pid(instance_id: &str) -> (Option<String>, Option<String>) {
     (grab("VID_"), grab("PID_"))
 }
 
+/// Which side of the case a port is on, from the ACPI _PLD buffer that
+/// Windows exposes as DEVPKEY_Device_PhysicalDeviceLocation. Only as good as
+/// the motherboard firmware: some boards report nothing or "back" for all.
+pub fn parse_pld_panel(pld: &[u8]) -> Option<&'static str> {
+    // Bits 64..95: UserVisible(64) Dock(65) Lid(66) Panel(67-69) ...
+    let d2 = u32::from_le_bytes(pld.get(8..12)?.try_into().ok()?);
+    let revision = pld.first()? & 0x7F;
+    if revision == 0 {
+        return None;
+    }
+    Some(match (d2 >> 3) & 0x7 {
+        0 => "top",
+        1 => "bottom",
+        2 => "left",
+        3 => "right",
+        4 => "front",
+        5 => "back",
+        _ => return None,
+    })
+}
+
 /// "Port_#0003.Hub_#0001" -> Some(3)
 pub fn parse_port(location: &str) -> Option<u32> {
     let start = location.find("Port_#")? + "Port_#".len();
@@ -419,6 +440,22 @@ mod tests {
             (Some("046D".into()), Some("C52B".into()))
         );
         assert_eq!(parse_vid_pid(r"USB\ROOT_HUB30\4&1"), (None, None));
+    }
+
+    fn pld(panel: u32) -> Vec<u8> {
+        let mut b = vec![0u8; 16];
+        b[0] = 2; // revision
+        b[8..12].copy_from_slice(&((1 | (panel << 3)) as u32).to_le_bytes());
+        b
+    }
+
+    #[test]
+    fn panel() {
+        assert_eq!(parse_pld_panel(&pld(4)), Some("front"));
+        assert_eq!(parse_pld_panel(&pld(5)), Some("back"));
+        assert_eq!(parse_pld_panel(&pld(2)), Some("left"));
+        assert_eq!(parse_pld_panel(&pld(6)), None, "unknown");
+        assert_eq!(parse_pld_panel(&[2, 0, 0]), None, "too short");
     }
 
     #[test]

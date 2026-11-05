@@ -15,6 +15,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "USB Toggle",
         "width": 620,
         "height": 760,
@@ -27,22 +28,13 @@
     ]
   },
   "bundle": {
-    "active": true,
-    "targets": [
-      "msi",
-      "nsis"
-    ],
+    "active": false,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "shortDescription": "Turn USB devices on and off",
-    "windows": {
-      "nsis": {
-        "installMode": "perMachine"
-      }
-    }
+    "shortDescription": "Turn USB devices on and off"
   }
 }

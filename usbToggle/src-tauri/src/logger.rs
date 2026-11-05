@@ -14,8 +14,7 @@ pub struct Logger {
 pub static LOGGER: Logger = Logger { path: Mutex::new(None) };
 
 pub fn log_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    base.join("usbToggle").join("logs")
+    crate::paths::log_dir()
 }
 
 impl Logger {

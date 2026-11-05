@@ -39,6 +39,9 @@ pub struct Device {
     /// Part of the PC itself (built-in webcam, Bluetooth, fingerprint
     /// reader, internal hubs...) rather than plugged into a USB port.
     pub built_in: bool,
+    /// Side of the case the port is on (front/back/left/right/top/bottom),
+    /// when the firmware says. Devices behind a hub use the hub's port.
+    pub panel: Option<&'static str>,
     /// Last time Windows saw the device arrive or leave (Unix ms).
     pub last_seen: Option<i64>,
     /// Names of the functions/drivers under this device (keyboard, disk, ...).
@@ -145,6 +148,7 @@ pub(crate) fn assemble(nodes: Vec<RawNode>) -> Vec<Device> {
             }),
             port: classify::parse_port(&n.location),
             built_in: is_built_in(n),
+            panel: panel_of(n, &nodes, &by_id),
             last_seen: n.last_seen,
             functions: function_names,
             pinned: false,
@@ -165,6 +169,7 @@ pub(crate) struct RawNode {
     pub removable: Option<bool>,
     /// Device belongs to the computer's own container (part of the PC).
     pub in_machine_container: Option<bool>,
+    pub panel: Option<&'static str>,
     pub parent_id: Option<String>,
     pub last_seen: Option<i64>,
     /// Functions below this node (connected devices only).
@@ -182,6 +187,21 @@ fn is_built_in(n: &RawNode) -> bool {
         // Unknown: show it rather than hide something real.
         (None, None) => false,
     }
+}
+
+/// The panel of the device's own port, or of the nearest hub above it.
+fn panel_of(n: &RawNode, nodes: &[RawNode], by_id: &HashMap<String, usize>) -> Option<&'static str> {
+    let mut cur = n;
+    for _ in 0..8 {
+        if cur.panel.is_some() {
+            return cur.panel;
+        }
+        cur = &nodes[*by_id.get(cur.parent_id.as_ref()?)?];
+        if is_root_hub(cur) {
+            return None;
+        }
+    }
+    None
 }
 
 pub(crate) const MACHINE_CONTAINER: &str = "{00000000-0000-0000-ffff-ffffffffffff}";
@@ -466,6 +486,10 @@ pub(crate) mod imp {
                 present: is_present,
                 location: registry_string(&set, &data, SPDRP_LOCATION_INFORMATION),
                 removable: registry_dword(&set, &data, SPDRP_CAPABILITIES).map(|c| c & CM_DEVCAP_REMOVABLE != 0),
+                panel: match property_bytes(&set, &data, &DEVPKEY_Device_PhysicalDeviceLocation) {
+                    Some((t, b)) if t == DEVPROP_TYPE_BINARY => classify::parse_pld_panel(&b),
+                    _ => None,
+                },
                 in_machine_container: (!container.is_empty())
                     .then(|| container.eq_ignore_ascii_case(super::MACHINE_CONTAINER)),
                 ..Default::default()
@@ -566,6 +590,16 @@ mod tests {
         let out2 = assemble(vec![internal_hub, mouse]);
         assert!(out2[0].built_in && out2[0].is_hub);
         assert!(out2[1].hub_id.is_none() && !out2[1].built_in);
+
+        // Devices behind an external hub report the panel of the hub's port.
+        let mut front_hub = node(r"USB\VID_2109&PID_2817\7&1", "USB", "USB2.0 Hub", true);
+        front_hub.info.service = "USBHUB3".into();
+        front_hub.panel = Some("front");
+        let mut stick2 = node(r"USB\VID_0951&PID_1666\ABC", "USB", "USB Mass Storage Device", true);
+        stick2.parent_id = Some(front_hub.instance_id.clone());
+        let out3 = assemble(vec![front_hub, stick2]);
+        assert_eq!(out3[0].panel, Some("front"));
+        assert_eq!(out3[1].panel, Some("front"));
         assert_eq!(r.functions, vec!["HID Keyboard Device", "HID-compliant mouse"]);
 
         let s = &out[2];

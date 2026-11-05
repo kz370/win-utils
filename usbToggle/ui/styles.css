@@ -386,13 +386,13 @@ button {
 
 .toolbar {
   display: flex;
-  flex-direction: column;
   gap: 10px;
   padding: 0 20px 14px;
 }
 
 .search {
   position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
@@ -482,45 +482,6 @@ button {
   display: none;
 }
 
-.filters {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.inline-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-2);
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.switch-sm {
-  width: 36px;
-  height: 20px;
-  border-radius: 10px;
-}
-
-.switch-sm .knob {
-  width: 10px;
-  height: 10px;
-  margin-top: -5px;
-}
-
-.switch-sm:hover .knob {
-  width: 12px;
-  height: 12px;
-  margin-top: -6px;
-}
-
-.switch-sm[aria-checked="true"] .knob {
-  transform: translateX(16px);
-}
-
 .segmented {
   display: inline-flex;
   flex: none;
@@ -533,7 +494,7 @@ button {
 
 .segmented button {
   min-width: 46px;
-  height: 26px;
+  height: 30px;
   padding: 0 10px;
   border: 0;
   border-radius: 5px;
@@ -1435,6 +1396,15 @@ button.section-head:hover {
 }
 
 @media (max-width: 520px) {
+  .toolbar {
+    flex-direction: column;
+  }
+  .search {
+    flex: none;
+  }
+  .segmented#filter button {
+    flex: 1;
+  }
   .details-content {
     margin-left: 14px;
   }

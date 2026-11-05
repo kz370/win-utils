@@ -6,6 +6,7 @@ mod devices;
 mod elevation;
 mod logger;
 mod notify;
+mod paths;
 mod win;
 
 use serde::Serialize;
@@ -65,6 +66,7 @@ struct AppInfo {
     autostart: autostart::AutostartState,
     config_path: String,
     log_dir: String,
+    portable: bool,
     config_error: Option<String>,
 }
 
@@ -340,6 +342,7 @@ async fn get_info(app: AppHandle) -> Result<AppInfo, String> {
             autostart: autostart::state(),
             config_path: core.store.path().display().to_string(),
             log_dir: logger::log_dir().display().to_string(),
+            portable: paths::is_portable(),
             config_error,
         }
     })
@@ -496,6 +499,16 @@ pub fn run() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+
+            // The window is created here (not from the config) so the
+            // portable version can keep the WebView2 profile next to the exe.
+            if let Some(cfg) = app.config().app.windows.iter().find(|w| w.label == "main") {
+                let mut builder = tauri::WebviewWindowBuilder::from_config(&handle, cfg)?;
+                if let Some(dir) = paths::webview_dir() {
+                    builder = builder.data_directory(dir);
+                }
+                builder.build()?;
+            }
 
             let mut tray = TrayIconBuilder::with_id(TRAY_ID)
                 .tooltip("USB Toggle")
