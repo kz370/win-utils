@@ -18,9 +18,10 @@ chargers and LEDs may keep working.
   that use USB internally (built-in webcam, Bluetooth, fingerprint reader,
   motherboard hub chips) are hidden; turn off **Only devices on USB ports** in
   Settings to see them.
-- Shows whether a port is on the front or back panel (or left/right side on a
-  laptop) when the motherboard firmware provides it. Search for "front" or
-  "back" to filter. Some boards report every port as "back" or don't say.
+- Groups connected devices by where the port is: **Front panel**, **Back
+  panel** (or left/right side on a laptop), when the motherboard firmware
+  provides it; anything else goes under "Other ports". Devices behind a hub
+  follow the hub's port. Search for "front" or "back" to filter. Some boards report every port as "back" or don't say.
 - The list updates by itself when you plug in or remove something.
 - Optionally, devices Windows remembers but that aren't plugged in (Settings),
   so you can turn one off before plugging it in. Disconnected devices that are

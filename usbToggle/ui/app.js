@@ -36,6 +36,7 @@
     top: "Top",
     bottom: "Bottom",
   };
+  const PANEL_ORDER = ["front", "back", "left", "right", "top", "bottom"];
   const panelLabel = (d) => (d.panel && PANEL[d.panel]) || null;
 
   const RISKY = new Set(["keyboard", "mouse", "input", "hub", "bluetooth"]);
@@ -414,7 +415,7 @@
     return true;
   }
 
-  function metaParts(d) {
+  function metaParts(d, hidePanel = false) {
     const parts = [];
     const on = isOn(d);
     if (isBusy(d)) {
@@ -433,7 +434,7 @@
     if (d.vendor && !d.name.toLowerCase().includes(d.vendor.split(" ")[0].toLowerCase())) parts.push(d.vendor);
     if (d.builtIn) parts.push(h("span", { class: "built-in-tag", text: "Built-in" }));
     else if (d.present) {
-      if (panelLabel(d)) parts.push(panelLabel(d));
+      if (panelLabel(d) && !hidePanel) parts.push(panelLabel(d));
       if (d.hubName) parts.push(`via ${d.hubName}`);
       else if (d.port) parts.push(`Port ${d.port}`);
     }
@@ -515,7 +516,7 @@
     refs.label.textContent = d.name;
     refs.label.title = d.name;
     refs.pinMark.hidden = !d.pinned;
-    refs.meta.replaceChildren(...metaParts(d));
+    refs.meta.replaceChildren(...metaParts(d, row.inPanelSection));
     refs.main.setAttribute("aria-expanded", String(expanded));
 
     refs.pin.setAttribute("aria-pressed", String(!!d.pinned));
@@ -791,9 +792,19 @@
       .filter((d) => !d.pinned && !d.present)
       .sort((a, b) => Number(a.enabled) - Number(b.enabled) || (b.lastSeen || 0) - (a.lastSeen || 0));
 
+    // Connected devices are grouped by where the port is on the case
+    // (front, back, ...). Devices behind a hub follow the hub's port.
+    const external = connected.filter((d) => !d.builtIn);
+    const byPanel = PANEL_ORDER.map((p) => [p, external.filter((d) => d.panel === p)]);
+    const anyPanel = byPanel.some(([, items]) => items.length);
+    const unplaced = external.filter((d) => !PANEL[d.panel]);
+    const builtIn = connected.filter((d) => d.builtIn);
+
     const groups = [
       ["pinned", "Pinned", pinned, false],
-      ["connected", "Connected", connected, false],
+      ...byPanel.map(([p, items]) => [`panel-${p}`, PANEL[p], items, false]),
+      ["connected", anyPanel ? "Other ports" : "Connected", unplaced, false],
+      ["builtin", "Built into this PC", builtIn, false],
       ["hubs", "USB hubs", hubs, true],
       ["disconnected", "Not connected", gone, true],
     ];
@@ -814,6 +825,8 @@
           sec.cards,
           items.map((d) => {
             const row = rows.get(d.id) || createRow(d);
+            // The section title already says front/back; don't repeat it.
+            row.inPanelSection = key.startsWith("panel-");
             updateRow(row, d);
             return row.root;
           })
