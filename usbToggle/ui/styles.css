@@ -1006,6 +1006,10 @@ button.section-head:hover {
   text-align: center;
 }
 
+.hidden-note + .hidden-note {
+  margin-top: 8px;
+}
+
 .link-btn {
   padding: 2px 4px;
   border: 0;

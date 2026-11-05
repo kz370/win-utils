@@ -25,6 +25,9 @@ pub struct Settings {
     pub ports_only: bool,
     /// Ask before turning off keyboards, mice, hubs and Bluetooth adapters.
     pub confirm_risky: bool,
+    /// Hide connected devices Windows reports a problem with (code 43, no
+    /// driver, ...). Disabled devices are not "problems".
+    pub hide_problems: bool,
 }
 
 impl Default for Settings {
@@ -37,6 +40,7 @@ impl Default for Settings {
             show_hubs: false,
             ports_only: true,
             confirm_risky: true,
+            hide_problems: true,
         }
     }
 }
@@ -169,6 +173,7 @@ mod tests {
         assert!(cfg.settings.close_to_tray);
         assert!(cfg.settings.ports_only, "new setting defaults to on for existing files");
         assert!(!cfg.settings.show_hubs && !cfg.settings.show_disconnected);
+        assert!(cfg.settings.hide_problems, "new setting defaults to on");
         assert!(cfg.devices.is_empty());
     }
 

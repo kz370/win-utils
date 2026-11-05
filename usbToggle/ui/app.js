@@ -74,6 +74,7 @@
     showHubs: false,
     portsOnly: true,
     confirmRisky: true,
+    hideProblems: true,
   };
 
   // ------------------------------------------------------------- state --
@@ -163,6 +164,8 @@
     return null;
   }
 
+  // Connected and not working. Disabled (code 22) is the user's choice, not a problem.
+  const hasProblem = (d) => d.present && !!d.problem && d.problem !== 22;
   const isOn = (d) => (state.pending.has(d.id) ? state.pending.get(d.id) : d.enabled);
   const isBusy = (d) => state.pending.has(d.id) || state.busy.has(d.id);
   const categoryLabel = (d) => CATEGORY[d.category] || CATEGORY.other;
@@ -697,19 +700,31 @@
     return s;
   }
 
-  let hiddenNote = null;
-  function getHiddenNote() {
-    if (!hiddenNote) {
+  // Notes at the end of the list about devices hidden by a setting, each
+  // with a button that turns the setting off.
+  const hiddenNotes = new Map();
+  function getHiddenNote(key, settingsPatch) {
+    let note = hiddenNotes.get(key);
+    if (!note) {
       const text = h("span");
       const root = h(
         "div",
         { class: "hidden-note" },
         text,
-        h("button", { class: "link-btn", type: "button", text: "Show them", onclick: () => saveSettings({ portsOnly: false }) })
+        h("button", { class: "link-btn", type: "button", text: "Show them", onclick: () => saveSettings(settingsPatch) })
       );
-      hiddenNote = { root, text };
+      note = { root, text };
+      hiddenNotes.set(key, note);
     }
-    return hiddenNote;
+    return note;
+  }
+
+  // "<lead>: A, B, C and 2 more."
+  function describeHidden(list, lead) {
+    const present = list.filter((d) => d.present);
+    const names = (present.length ? present : list).slice(0, 3).map((d) => d.name);
+    const more = list.length - names.length;
+    return `${lead(list.length)}: ${names.join(", ")}${more > 0 ? ` and ${more} more` : ""}.`;
   }
 
   function reconcile(container, nodes) {
@@ -752,7 +767,10 @@
     }
     const s = state.settings;
     const connected = state.devices.filter(
-      (d) => d.present && (s.showHubs || !d.isHub) && (!s.portsOnly || !d.builtIn || d.pinned)
+      (d) =>
+        d.present &&
+        (s.showHubs || !d.isHub) &&
+        (d.pinned || ((!s.portsOnly || !d.builtIn) && (!s.hideProblems || !hasProblem(d))))
     );
     const off = connected.filter((d) => !d.enabled).length;
     const parts = [`${connected.length} connected`];
@@ -773,6 +791,7 @@
     const q = state.query.trim().toLowerCase();
     const s = state.settings;
     const hiddenBuiltIn = [];
+    const hiddenProblems = [];
     const visible = state.devices.filter((d) => {
       if (!matches(d, q) || !passesFilter(d)) return false;
       if (d.pinned) return true;
@@ -780,6 +799,10 @@
       if (!d.present && !s.showDisconnected && d.enabled && !q) return false;
       if (d.builtIn && s.portsOnly) {
         hiddenBuiltIn.push(d);
+        return false;
+      }
+      if (s.hideProblems && hasProblem(d)) {
+        hiddenProblems.push(d);
         return false;
       }
       return true;
@@ -853,21 +876,26 @@
           })
         );
       } else {
-        const text = hiddenBuiltIn.length
-          ? "Nothing is plugged into a USB port right now."
+        const someHidden = hiddenBuiltIn.length + hiddenProblems.length > 0;
+        const text = someHidden
+          ? "Nothing working is plugged into a USB port right now."
           : "Plug something in. The list updates by itself.";
-        nodes.push(emptyState("usb", "No USB devices found", text, hiddenBuiltIn.length ? null : { label: "Refresh", run: refresh }));
+        nodes.push(emptyState("usb", "No USB devices found", text, someHidden ? null : { label: "Refresh", run: refresh }));
       }
     }
 
     if (hiddenBuiltIn.length) {
-      const present = hiddenBuiltIn.filter((d) => d.present);
-      const names = (present.length ? present : hiddenBuiltIn).slice(0, 3).map((d) => d.name);
-      const more = hiddenBuiltIn.length - names.length;
-      const n = hiddenBuiltIn.length;
-      const note = getHiddenNote();
-      note.text.textContent =
-        `${n} built-in device${n === 1 ? "" : "s"} hidden: ${names.join(", ")}${more > 0 ? ` and ${more} more` : ""}.`;
+      const note = getHiddenNote("builtin", { portsOnly: false });
+      note.text.textContent = describeHidden(hiddenBuiltIn, (n) =>
+        n === 1 ? "1 built-in device is hidden" : `${n} built-in devices are hidden`
+      );
+      nodes.push(note.root);
+    }
+    if (hiddenProblems.length) {
+      const note = getHiddenNote("problems", { hideProblems: false });
+      note.text.textContent = describeHidden(hiddenProblems, (n) =>
+        n === 1 ? "1 device isn't working and is hidden" : `${n} devices aren't working and are hidden`
+      );
       nodes.push(note.root);
     }
 
