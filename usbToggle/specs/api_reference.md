@@ -132,7 +132,7 @@ Returns general information about the app.
 
 ```js
 const info = await invoke("get_info");
-// { version: "1.1.0", elevated: true, settings: {...}, autostart: { enabled: false, elevated: false },
+// { version: "0.1.0", elevated: true, settings: {...}, autostart: { enabled: false, elevated: false },
 //   configPath: "C:\\Users\\me\\AppData\\Roaming\\usbToggle\\config.json",
 //   logDir: "C:\\Users\\me\\AppData\\Local\\usbToggle\\logs", portable: false, configError: null }
 ```

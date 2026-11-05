@@ -411,7 +411,7 @@ Rust toolchain, Node.js/npm, `@tauri-apps/cli`, PowerShell, optionally Inno Setu
 npm manifest that provides the Tauri CLI. Build layer.
 
 ### Summary
-Private package `usb-toggle` 1.1.0. Scripts: `tauri` (raw CLI), `dev` (`tauri dev`), `build`
+Private package `usb-toggle` 0.1.0. Scripts: `tauri` (raw CLI), `dev` (`tauri dev`), `build`
 (`tauri build`), `icons:library` (regenerates `ui/icon-library.js`). Dev dependencies: `@tauri-apps/cli`
 `^2`, `lucide-static` `1.68.0`.
 
@@ -593,7 +593,7 @@ None.
 Rust crate manifest. Build layer.
 
 ### Summary
-Package `usb-toggle` 1.1.0 (edition 2021, `rust-version` 1.77.2). Library target `usb_toggle_lib`
+Package `usb-toggle` 0.1.0 (edition 2021, `rust-version` 1.77.2). Library target `usb_toggle_lib`
 (`staticlib`, `cdylib`, `rlib`) and binary target `usbToggle` (`src/main.rs`).
 
 ### Technical Details
@@ -659,7 +659,7 @@ None.
 Tauri application configuration.
 
 ### Summary
-- `productName` `usbToggle`, `mainBinaryName` `usbToggle`, `version` `1.1.0`, `identifier` `com.usbtoggle.app`.
+- `productName` `usbToggle`, `mainBinaryName` `usbToggle`, `version` `0.1.0`, `identifier` `com.usbtoggle.app`.
 - `build.frontendDist` `../ui` (served as embedded assets; no dev server, no build command).
 - `app.withGlobalTauri: true` (exposes `window.__TAURI__` to `app.js`), `security.csp: null`.
 - One window definition, label `main`, title "USB Toggle", 620×760 (minimum 440×520), centered,
