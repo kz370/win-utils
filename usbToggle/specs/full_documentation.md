@@ -350,18 +350,20 @@ None.
 ## File: /README.md
 
 ### Purpose
-User-facing overview of the app: features, administrator rights, building, file locations and source layout.
+User guide: how to install and use the app, in plain language.
 
 ### Summary
-Describes what turning a device off means, lists features (port-only filter, front/back grouping,
-live updates, pins, tray, autostart), explains the build outputs in `dist\`, and tabulates where settings,
-logs and WebView2 data live for installed and portable modes.
+Explains what turning a device off means, installation (installer and portable), the administrator
+requirement, reading the grouped list and what is hidden by default, switching devices, protection, renaming,
+pinning and icons, the tray menu, every setting with its default (and the Save/Discard behavior), keyboard
+shortcuts, changing the app icon with `set-icons.bat`, a troubleshooting table, where files are stored in
+installed and portable mode, and a short build section that points to `specs/`.
 
 ### Technical Details
 Markdown. Installed by the Inno Setup script into the program folder.
 
 ### Business Logic
-Documents rules P7–P9 and the default display rules (V2–V5) in user terms.
+Describes rules P7–P9, P16, S0, S8, V1–V5 and I1 in user terms.
 
 ### Dependencies
 Referenced by `installer/usbToggle.iss` (`[Files]`).
