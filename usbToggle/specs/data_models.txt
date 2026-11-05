@@ -1,0 +1,252 @@
+USBTOGGLE DATA MODELS
+=====================
+All schemas, entities, interfaces and types used by usbToggle.
+Rust types are serialized with serde; "wire name" is the JSON field name (camelCase).
+Paths are relative to usbToggle/.
+
+==============================================================================
+1. IPC ENTITIES (back end -> window)
+==============================================================================
+
+Device  (src-tauri/src/devices.rs)  - one physical USB device
+------------------------------------------------------------------------------
+wire name      Rust type              notes
+id             String                 Windows device instance ID; identity of the device
+defaultName    String                 automatic display name
+name           String                 customName if set, else defaultName
+customName     Option<String>         user-chosen name (null when not set)
+description    String                 Windows device description (SPDRP_DEVICEDESC)
+vendor         Option<String>         company name from the VID table
+vid            Option<String>         4 hex digits, upper case
+pid            Option<String>         4 hex digits, upper case
+category       Category               see Category below
+present        bool                   connected now
+enabled        bool                   not disabled in Windows
+problem        u32                    problem code for connected devices; 0 = OK; 22 = disabled
+isHub          bool                   USB hub
+hubId          Option<String>         instance ID of the external parent hub
+hubName        Option<String>         display name of that hub
+port           Option<u32>            port number on the parent hub (from Port_#NNNN)
+builtIn        bool                   part of the PC (machine container / not removable)
+panel          Option<&'static str>   "front" | "back" | "left" | "right" | "top" | "bottom"
+lastSeen       Option<i64>            last arrival (present) or removal (absent), Unix ms
+functions      Vec<String>            readable names of functions below the device; empty for hubs
+pinned         bool                   pinned by the user
+locked         bool                   protected: cannot be turned off (can be turned on)
+autoLocked     bool                   protected by the keyboard/mouse rule, not by the user
+Invariants: id is unique in a list; name is never empty; hubId is never a root hub or a built-in hub;
+problem is 0 when present is false; functions is empty when isHub is true.
+
+Category  (src-tauri/src/classify.rs)  - enum, serialized lowercase
+------------------------------------------------------------------------------
+keyboard | mouse | input | gamepad | audio | camera | storage | phone | bluetooth | network |
+printer | serial | security | hub | other
+Labels (Category::label): Keyboard, Mouse, Input device, Game controller, Audio device, Camera,
+Storage, Phone, Bluetooth adapter, Network adapter, Printer, Serial device, Security key, USB hub,
+USB device. (The window uses its own label table, e.g. "Keyboard & mouse" for input.)
+
+Snapshot  (src-tauri/src/lib.rs)
+------------------------------------------------------------------------------
+devices        Vec<Device>            sorted by name (case-insensitive), then id
+busy           Vec<String>            IDs with an operation in progress, sorted
+scannedAt      i64                    last scan time, Unix ms; 0 before the first scan
+error          Option<String>         last scan error
+
+AppInfo  (src-tauri/src/lib.rs)
+------------------------------------------------------------------------------
+version        String                 package version
+elevated       bool                   process is elevated
+settings       Settings               current settings
+autostart      AutostartState         startup registration
+configPath     String                 full path of config.json
+logDir         String                 full path of the log folder
+portable       bool                   portable mode
+configError    Option<String>         message produced while loading config.json
+
+ToggleResult  (src-tauri/src/lib.rs)
+------------------------------------------------------------------------------
+ok             bool
+code           Option<&'static str>   "locked" | "accessDenied" | "notDisableable" | "missing" | "failed"
+message        Option<String>         error text, or the restart notice
+needsRestart   bool                   restart required, or the device did not reach the requested state
+snapshot       Snapshot               list after the operation
+
+AutostartState  (src-tauri/src/autostart.rs)
+------------------------------------------------------------------------------
+enabled        bool                   task or Run value exists
+elevated       bool                   the scheduled task exists (elevated start)
+
+Event payloads
+------------------------------------------------------------------------------
+"devices"      Snapshot
+"busy"         Vec<String>            IDs in progress (unsorted)
+"toast"        { kind: "error", message: string|null, code: string|null }
+
+==============================================================================
+2. PERSISTED SCHEMA: config.json
+==============================================================================
+Location: %APPDATA%\usbToggle\config.json (portable: <exe dir>\data\config.json)
+Encoding: UTF-8 JSON, pretty-printed. Written atomically (config.json.tmp then rename).
+
+Config  (src-tauri/src/config.rs)
+------------------------------------------------------------------------------
+schemaVersion  u32                         current = 3
+settings       Settings
+devices        BTreeMap<String, DeviceSettings>   key = upper-case instance ID
+
+Settings
+------------------------------------------------------------------------------
+field             type     default    meaning
+theme             String   "system"   "system" | "light" | "dark"
+closeToTray       bool     true       closing the window hides it
+startMinimized    bool     true       start hidden when launched with --autostart
+showDisconnected  bool     false      list remembered devices that are not plugged in
+showHubs          bool     false      list USB hubs
+portsOnly         bool     true       hide devices built into the PC
+confirmRisky      bool     true       confirm before turning off keyboards, mice, hubs, Bluetooth
+hideProblems      bool     true       hide connected devices with a problem code other than 22
+protectInput      bool     true       protect keyboards, mice and keyboard+mouse devices
+
+DeviceSettings
+------------------------------------------------------------------------------
+name              Option<String>   omitted when null
+pinned            bool             omitted when false
+locked            Option<bool>     omitted when null; null = follow protectInput, true/false = user override
+An entry with no name, pinned=false and no lock choice is removed.
+
+Example:
+{
+  "schemaVersion": 3,
+  "settings": {
+    "theme": "dark",
+    "closeToTray": true,
+    "startMinimized": true,
+    "showDisconnected": false,
+    "showHubs": false,
+    "portsOnly": true,
+    "confirmRisky": true,
+    "hideProblems": true,
+    "protectInput": true
+  },
+  "devices": {
+    "USB\\VID_046D&PID_0825\\ABC123": { "name": "Desk webcam", "pinned": true, "locked": true },
+    "USB\\VID_1532&PID_0084\\7&1": { "locked": false }
+  }
+}
+
+Schema history and migration
+------------------------------------------------------------------------------
+v1  Original Tauri prototype (devices stored as an array). Does not match the current shape, so it is
+    treated as damaged: backed up to config.<timestamp>.bak.json and replaced by defaults.
+v2  Current shape without portsOnly; showHubs/showDisconnected defaulted to true.
+v3  Adds portsOnly. Loading v1/v2 sets portsOnly=true, showHubs=false, showDisconnected=false once.
+    Later added within v3: hideProblems, protectInput and devices.<id>.locked (missing in older v3
+    files, so they take their defaults).
+>3  Not supported: defaults are used and a message is shown; the file is left as is until the next save.
+Damaged JSON: copied to config.<yyyyMMdd-HHmmss>.bak.json, defaults used, message shown.
+
+==============================================================================
+3. INTERNAL ENTITIES (back end)
+==============================================================================
+
+Core  (src-tauri/src/lib.rs)  - process-wide state, Arc<Core> managed by Tauri
+------------------------------------------------------------------------------
+store          Store                      config.json location
+config         Mutex<Config>              current configuration
+config_error   Mutex<Option<String>>      load message
+devices        Mutex<Vec<Device>>         last scan result (names/pins/protection applied)
+scan_error     Mutex<Option<String>>      last scan error
+scanned_at     Mutex<i64>                 last scan time
+scanned        AtomicBool                 a scan has completed
+busy           Mutex<HashSet<String>>     IDs with an operation in progress
+scan_lock      Mutex<()>                  serializes scans
+op_lock        Mutex<()>                  serializes enable/disable operations
+elevated       bool                       process elevation (fixed at start)
+start_hidden   bool                       started in the tray
+
+RawNode  (src-tauri/src/devices.rs)  - one device node as read from Windows
+------------------------------------------------------------------------------
+instance_id           String
+info                  NodeInfo
+present               bool
+disabled              bool               problem 22 or CONFIGFLAG_DISABLED
+problem               u32
+location              String             SPDRP_LOCATION_INFORMATION, e.g. "Port_#0003.Hub_#0001"
+removable             Option<bool>       CM_DEVCAP_REMOVABLE from SPDRP_CAPABILITIES
+in_machine_container  Option<bool>       base container ID == MACHINE_CONTAINER
+panel                 Option<&'static str>  parsed from DEVPKEY_Device_PhysicalDeviceLocation
+parent_id             Option<String>     parent instance ID (present nodes)
+last_seen             Option<i64>        Unix ms
+descendants           Vec<NodeInfo>      nodes below (present, non-interface, non-root-hub nodes)
+
+NodeInfo  (src-tauri/src/classify.rs)
+------------------------------------------------------------------------------
+class            String         setup class (USB, HIDClass, Keyboard, Mouse, Camera, DiskDrive, ...)
+description      String         device description
+friendly_name    String         friendly name
+bus_description  String         DEVPKEY_Device_BusReportedDeviceDesc (USB iProduct string)
+service          String         driver service (USBHUB3, HidUsb, ...)
+hardware_ids     Vec<String>
+compatible_ids   Vec<String>
+
+ActionError / ActionOutcome  (src-tauri/src/control.rs)
+------------------------------------------------------------------------------
+ActionError    { code: &'static str, message: String }   code as in ToggleResult.code
+ActionOutcome  { needs_restart: bool }                     DI_NEEDREBOOT or DI_NEEDRESTART set
+
+DevInfoSet  (src-tauri/src/devices.rs)
+------------------------------------------------------------------------------
+Tuple struct over HDEVINFO; SetupDiDestroyDeviceInfoList on drop.
+
+Store  (src-tauri/src/config.rs)
+------------------------------------------------------------------------------
+path           PathBuf         <config_dir>\config.json
+
+Logger  (src-tauri/src/logger.rs)
+------------------------------------------------------------------------------
+path           Mutex<Option<PathBuf>>   <log_dir>\usbToggle.log once initialized
+
+==============================================================================
+4. WINDOWS DATA INTERPRETED BY THE APP
+==============================================================================
+Instance ID           "USB\VID_xxxx&PID_yyyy[&MI_nn]\<serial or port-based id>"
+                      &MI_nn = interface of a composite device; ROOT_HUB* = root hub.
+Machine container     {00000000-0000-0000-ffff-ffffffffffff}
+Config flags          bit 0x1 CONFIGFLAG_DISABLED = disabled persistently
+Capabilities          bit 0x4 CM_DEVCAP_REMOVABLE
+Problem codes         22 = disabled; others mapped to text in ui/app.js (PROBLEMS)
+_PLD buffer           byte 0 bits 0-6 = revision (0 = invalid);
+                      DWORD at byte 8: bit 0 UserVisible, bits 3-5 Panel
+                      (0 top, 1 bottom, 2 left, 3 right, 4 front, 5 back, 6 unknown)
+Location information  "Port_#NNNN.Hub_#NNNN"
+
+==============================================================================
+5. FRONT-END STATE (ui/app.js)
+==============================================================================
+state.loaded       boolean              first snapshot received
+state.devices      Device[]             last snapshot list
+state.byId         Map<string, Device>
+state.busy         Set<string>          from the back end ("busy" event / snapshot)
+state.pending      Map<string, boolean> optimistic target state while a request is running
+state.scannedAt    number
+state.scanError    string|null
+state.info         AppInfo|null
+state.settings     Settings             (DEFAULT_SETTINGS merged with AppInfo.settings)
+state.filter       "all" | "on" | "off"
+state.query        string
+state.expanded     Set<string>          rows with open details
+state.collapsed    { disconnected: boolean, hubs: boolean }
+state.refreshing   boolean
+
+localStorage keys (prefix "usbToggle.")
+theme          "system" | "light" | "dark"   avoids a theme flash before AppInfo arrives
+collapsed      { disconnected, hubs }        collapsed sections
+pinHintShown   boolean                       the "pinned" tray hint was shown once
+
+==============================================================================
+6. COMMAND-LINE AND STARTUP ENTRIES
+==============================================================================
+Arguments: --tray | --hidden | --autostart | --wait-for-pid <pid>
+Scheduled task "usbToggle": logon trigger (current user, 3 s delay), RunLevel HighestAvailable,
+  InteractiveToken, IgnoreNew, no battery limits, no time limit, action "<exe>" --autostart.
+Run value HKCU\Software\Microsoft\Windows\CurrentVersion\Run\usbToggle = "\"<exe>\" --autostart".

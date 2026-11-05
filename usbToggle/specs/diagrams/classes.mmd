@@ -1,0 +1,162 @@
+%% usbToggle - data structures
+classDiagram
+    class Core {
+        +Store store
+        +Mutex~Config~ config
+        +Mutex~Option~String~~ config_error
+        +Mutex~Vec~Device~~ devices
+        +Mutex~Option~String~~ scan_error
+        +Mutex~i64~ scanned_at
+        +AtomicBool scanned
+        +Mutex~HashSet~String~~ busy
+        +Mutex scan_lock
+        +Mutex op_lock
+        +bool elevated
+        +bool start_hidden
+    }
+    class Snapshot {
+        +Vec~Device~ devices
+        +Vec~String~ busy
+        +i64 scanned_at
+        +Option~String~ error
+    }
+    class AppInfo {
+        +String version
+        +bool elevated
+        +Settings settings
+        +AutostartState autostart
+        +String config_path
+        +String log_dir
+        +bool portable
+        +Option~String~ config_error
+    }
+    class ToggleResult {
+        +bool ok
+        +Option~str~ code
+        +Option~String~ message
+        +bool needs_restart
+        +Snapshot snapshot
+    }
+    class Device {
+        +String id
+        +String default_name
+        +String name
+        +Option~String~ custom_name
+        +String description
+        +Option~String~ vendor
+        +Option~String~ vid
+        +Option~String~ pid
+        +Category category
+        +bool present
+        +bool enabled
+        +u32 problem
+        +bool is_hub
+        +Option~String~ hub_id
+        +Option~String~ hub_name
+        +Option~u32~ port
+        +bool built_in
+        +Option~str~ panel
+        +Option~i64~ last_seen
+        +Vec~String~ functions
+        +bool pinned
+        +bool locked
+        +bool auto_locked
+    }
+    class RawNode {
+        +String instance_id
+        +NodeInfo info
+        +bool present
+        +bool disabled
+        +u32 problem
+        +String location
+        +Option~bool~ removable
+        +Option~bool~ in_machine_container
+        +Option~str~ panel
+        +Option~String~ parent_id
+        +Option~i64~ last_seen
+        +Vec~NodeInfo~ descendants
+    }
+    class NodeInfo {
+        +String class
+        +String description
+        +String friendly_name
+        +String bus_description
+        +String service
+        +Vec~String~ hardware_ids
+        +Vec~String~ compatible_ids
+    }
+    class Category {
+        <<enumeration>>
+        keyboard
+        mouse
+        input
+        gamepad
+        audio
+        camera
+        storage
+        phone
+        bluetooth
+        network
+        printer
+        serial
+        security
+        hub
+        other
+        +label() str
+    }
+    class Config {
+        +u32 schema_version
+        +Settings settings
+        +BTreeMap~String, DeviceSettings~ devices
+        +device(id) DeviceSettings
+        +update_device(id, f)
+    }
+    class Settings {
+        +String theme
+        +bool close_to_tray
+        +bool start_minimized
+        +bool show_disconnected
+        +bool show_hubs
+        +bool ports_only
+        +bool confirm_risky
+        +bool hide_problems
+        +bool protect_input
+    }
+    class DeviceSettings {
+        +Option~String~ name
+        +bool pinned
+        +Option~bool~ locked
+        +is_empty() bool
+    }
+    class Store {
+        +PathBuf path
+        +load() Config
+        +save(Config)
+    }
+    class ActionError {
+        +str code
+        +String message
+    }
+    class ActionOutcome {
+        +bool needs_restart
+    }
+    class AutostartState {
+        +bool enabled
+        +bool elevated
+    }
+
+    Core *-- Store
+    Core *-- Config
+    Core o-- Device
+    Config *-- Settings
+    Config *-- DeviceSettings
+    Snapshot o-- Device
+    ToggleResult *-- Snapshot
+    AppInfo *-- Settings
+    AppInfo *-- AutostartState
+    Device --> Category
+    RawNode *-- NodeInfo
+    RawNode ..> Device : assemble()
+    ActionError ..> ToggleResult : mapped into
+    ActionOutcome ..> ToggleResult : mapped into
+    Store ..> Config : loads / saves
