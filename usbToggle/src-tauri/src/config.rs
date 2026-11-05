@@ -20,6 +20,9 @@ pub struct Settings {
     pub start_minimized: bool,
     pub show_disconnected: bool,
     pub show_hubs: bool,
+    /// Hide devices that are part of the PC (built-in webcam, Bluetooth,
+    /// internal hubs...) and list only what's plugged into real USB ports.
+    pub ports_only: bool,
     /// Ask before turning off keyboards, mice, hubs and Bluetooth adapters.
     pub confirm_risky: bool,
 }
@@ -31,7 +34,8 @@ impl Default for Settings {
             close_to_tray: true,
             start_minimized: true,
             show_disconnected: true,
-            show_hubs: false,
+            show_hubs: true,
+            ports_only: true,
             confirm_risky: true,
         }
     }
@@ -156,6 +160,7 @@ mod tests {
         let cfg: Config = serde_json::from_str(r#"{"schemaVersion":1,"settings":{"theme":"dark"}}"#).unwrap();
         assert_eq!(cfg.settings.theme, "dark");
         assert!(cfg.settings.close_to_tray);
+        assert!(cfg.settings.ports_only, "new setting defaults to on for existing files");
         assert!(cfg.devices.is_empty());
     }
 

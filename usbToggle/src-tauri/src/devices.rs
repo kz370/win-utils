@@ -36,6 +36,9 @@ pub struct Device {
     pub hub_id: Option<String>,
     pub hub_name: Option<String>,
     pub port: Option<u32>,
+    /// Part of the PC itself (built-in webcam, Bluetooth, fingerprint
+    /// reader, internal hubs...) rather than plugged into a USB port.
+    pub built_in: bool,
     /// Last time Windows saw the device arrive or leave (Unix ms).
     pub last_seen: Option<i64>,
     /// Names of the functions/drivers under this device (keyboard, disk, ...).
@@ -107,7 +110,9 @@ pub(crate) fn assemble(nodes: Vec<RawNode>) -> Vec<Device> {
             .as_ref()
             .and_then(|p| by_id.get(p))
             .map(|&pi| &nodes[pi])
-            .filter(|p| classify::is_hub(&p.info) && !is_root_hub(p));
+            // Built-in hub chips aren't something the user plugged in; for
+            // devices behind them the port number is more useful.
+            .filter(|p| classify::is_hub(&p.info) && !is_root_hub(p) && !is_built_in(p));
 
         let mut function_names: Vec<String> = Vec::new();
         let mut seen = HashSet::new();
@@ -139,6 +144,7 @@ pub(crate) fn assemble(nodes: Vec<RawNode>) -> Vec<Device> {
                 classify::display_name(&h.info, &h.descendants, Category::Hub, None)
             }),
             port: classify::parse_port(&n.location),
+            built_in: is_built_in(n),
             last_seen: n.last_seen,
             functions: function_names,
             pinned: false,
@@ -155,11 +161,30 @@ pub(crate) struct RawNode {
     pub disabled: bool,
     pub problem: u32,
     pub location: String,
+    /// Device capabilities say it sits on a removable (user-facing) port.
+    pub removable: Option<bool>,
+    /// Device belongs to the computer's own container (part of the PC).
+    pub in_machine_container: Option<bool>,
     pub parent_id: Option<String>,
     pub last_seen: Option<i64>,
     /// Functions below this node (connected devices only).
     pub descendants: Vec<NodeInfo>,
 }
+
+/// Windows groups each physical product into a "container". Devices that are
+/// part of the PC share the machine container; anything plugged into a real
+/// port (and anything behind it, like devices inside an external hub) gets
+/// its own. Firmware marks internal ports via ACPI, which is what decides this.
+fn is_built_in(n: &RawNode) -> bool {
+    match (n.in_machine_container, n.removable) {
+        (Some(internal), _) => internal,
+        (None, Some(removable)) => !removable,
+        // Unknown: show it rather than hide something real.
+        (None, None) => false,
+    }
+}
+
+pub(crate) const MACHINE_CONTAINER: &str = "{00000000-0000-0000-ffff-ffffffffffff}";
 
 fn device_part(instance_id: &str) -> &str {
     // "USB\VID_046D&PID_C52B&MI_00\7&1A2B..." -> "VID_046D&PID_C52B&MI_00"
@@ -433,12 +458,16 @@ pub(crate) mod imp {
                 compatible_ids: registry_multi(&set, &data, SPDRP_COMPATIBLEIDS),
             };
             let config_flags = registry_dword(&set, &data, SPDRP_CONFIGFLAGS).unwrap_or(0);
+            let container = registry_string(&set, &data, SPDRP_BASE_CONTAINERID);
 
             let mut node = RawNode {
                 instance_id: id,
                 info,
                 present: is_present,
                 location: registry_string(&set, &data, SPDRP_LOCATION_INFORMATION),
+                removable: registry_dword(&set, &data, SPDRP_CAPABILITIES).map(|c| c & CM_DEVCAP_REMOVABLE != 0),
+                in_machine_container: (!container.is_empty())
+                    .then(|| container.eq_ignore_ascii_case(super::MACHINE_CONTAINER)),
                 ..Default::default()
             };
 
@@ -493,14 +522,29 @@ mod tests {
         ];
         let iface = node(r"USB\VID_046D&PID_C52B&MI_00\7&4", "HIDClass", "USB Input Device", true);
 
+        // Laptop webcam on an internal port: same container as the PC.
+        let mut webcam = node(r"USB\VID_04F2&PID_B6DD\0001", "Camera", "Integrated Camera", true);
+        webcam.in_machine_container = Some(true);
+        webcam.removable = Some(false);
+
         let mut stick = node(r"USB\VID_0781&PID_5567\4C53", "USB", "USB Mass Storage Device", false);
         stick.info.compatible_ids = vec![r"USB\Class_08&SubClass_06&Prot_50".into()];
         stick.info.bus_description = "Cruzer Blade".into();
         stick.disabled = true;
 
-        let out = assemble(vec![root, hub, receiver, iface, stick]);
+        let out = assemble(vec![root, hub, receiver, iface, stick, webcam]);
         let ids: Vec<&str> = out.iter().map(|d| d.id.as_str()).collect();
-        assert_eq!(ids, vec![r"USB\VID_05E3&PID_0610\5&2", r"USB\VID_046D&PID_C52B\6&3&0&1", r"USB\VID_0781&PID_5567\4C53"]);
+        assert_eq!(
+            ids,
+            vec![
+                r"USB\VID_05E3&PID_0610\5&2",
+                r"USB\VID_046D&PID_C52B\6&3&0&1",
+                r"USB\VID_0781&PID_5567\4C53",
+                r"USB\VID_04F2&PID_B6DD\0001"
+            ]
+        );
+        assert!(out[3].built_in);
+        assert!(!out[1].built_in && !out[2].built_in, "unknown or external devices are not built-in");
 
         assert!(out[0].is_hub);
         assert!(out[0].hub_id.is_none(), "root hubs are not reported as a parent hub");
@@ -511,6 +555,17 @@ mod tests {
         assert_eq!(r.hub_id.as_deref(), Some(r"USB\VID_05E3&PID_0610\5&2"));
         assert_eq!(r.port, Some(1));
         assert!(r.enabled && r.present);
+
+        // A built-in hub chip is not reported as "via <hub>".
+        let mut internal_hub = node(r"USB\VID_0BDA&PID_5411\6&1", "USB", "Generic USB Hub", true);
+        internal_hub.info.service = "USBHUB3".into();
+        internal_hub.in_machine_container = Some(true);
+        let mut mouse = node(r"USB\VID_1532&PID_0084\7&1", "Mouse", "USB Input Device", true);
+        mouse.parent_id = Some(internal_hub.instance_id.clone());
+        mouse.in_machine_container = Some(false);
+        let out2 = assemble(vec![internal_hub, mouse]);
+        assert!(out2[0].built_in && out2[0].is_hub);
+        assert!(out2[1].hub_id.is_none() && !out2[1].built_in);
         assert_eq!(r.functions, vec!["HID Keyboard Device", "HID-compliant mouse"]);
 
         let s = &out[2];

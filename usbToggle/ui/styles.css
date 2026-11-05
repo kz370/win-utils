@@ -386,30 +386,36 @@ button {
 
 .toolbar {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  padding: 0 20px 12px;
+  padding: 0 20px 14px;
 }
 
 .search {
   position: relative;
-  flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 34px;
-  padding: 0 10px;
+  height: 38px;
+  padding: 0 8px 0 12px;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--muted);
   box-shadow: var(--shadow-sm);
+  cursor: text;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.search:hover {
+  border-color: var(--border-strong);
+}
+
+/* One focus ring for the whole field (the input itself draws none). */
 .search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .search [data-icon] {
@@ -421,6 +427,7 @@ button {
   flex: 1;
   min-width: 0;
   height: 100%;
+  padding: 0;
   border: 0;
   outline: 0;
   background: transparent;
@@ -429,12 +436,37 @@ button {
   user-select: text;
 }
 
+.search input:focus,
+.search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .search input::placeholder {
   color: var(--muted);
 }
 
-.search input::-webkit-search-cancel-button {
+.search-clear {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
+}
+
+.search-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.search-clear [data-icon] {
+  width: 14px;
+  height: 14px;
 }
 
 .search-hint {
@@ -445,8 +477,48 @@ button {
   color: var(--muted);
 }
 
-.search:focus-within .search-hint {
+.search:focus-within .search-hint,
+.search-clear:not([hidden]) ~ .search-hint {
   display: none;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.switch-sm {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.switch-sm .knob {
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+}
+
+.switch-sm:hover .knob {
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+}
+
+.switch-sm[aria-checked="true"] .knob {
+  transform: translateX(16px);
 }
 
 .segmented {
@@ -958,6 +1030,46 @@ button.section-head:hover {
   margin-top: 1px;
 }
 
+.hidden-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.link-btn {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.built-in-tag {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+}
+
 /* ---------------------------------------------------------- empty / load */
 
 .empty {
@@ -1175,6 +1287,38 @@ button.section-head:hover {
   padding: 20px 22px;
 }
 
+/* Long dialogs: the title bar (with its close button) stays put and only
+   the content scrolls. */
+.dialog-scroll[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialog-scroll .dialog-bar {
+  flex: none;
+  margin: 0;
+  padding: 14px 14px 12px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-scroll .dialog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 8px;
+}
+
+.dialog-scroll .dialog-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dialog-scroll .dialog-body::-webkit-scrollbar-thumb {
+  border: 3px solid var(--surface);
+  border-radius: 10px;
+  background: var(--border-strong);
+}
+
 .dialog-head {
   display: flex;
   align-items: center;
@@ -1291,18 +1435,6 @@ button.section-head:hover {
 }
 
 @media (max-width: 520px) {
-  .toolbar {
-    flex-direction: column;
-  }
-  .search {
-    flex: none;
-  }
-  .segmented#filter {
-    align-self: stretch;
-  }
-  .segmented#filter button {
-    flex: 1;
-  }
   .details-content {
     margin-left: 14px;
   }

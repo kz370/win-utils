@@ -43,13 +43,20 @@
       <div class="toolbar">
         <label class="search">
           <span data-icon="search"></span>
-          <input id="search" type="search" placeholder="Search devices" autocomplete="off" spellcheck="false" aria-label="Search devices" />
+          <input id="search" type="text" placeholder="Search devices" autocomplete="off" spellcheck="false" aria-label="Search devices" />
+          <button id="search-clear" class="search-clear" type="button" aria-label="Clear search" hidden><span data-icon="x"></span></button>
           <kbd class="search-hint">Ctrl F</kbd>
         </label>
-        <div class="segmented" role="radiogroup" aria-label="Filter" id="filter">
-          <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
-          <button type="button" role="radio" data-filter="on" aria-checked="false">On</button>
-          <button type="button" role="radio" data-filter="off" aria-checked="false">Off</button>
+        <div class="filters">
+          <div class="segmented" role="radiogroup" aria-label="Filter" id="filter">
+            <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
+            <button type="button" role="radio" data-filter="on" aria-checked="false">On</button>
+            <button type="button" role="radio" data-filter="off" aria-checked="false">Off</button>
+          </div>
+          <label class="inline-switch" title="Hide devices built into this PC, like the webcam, Bluetooth and internal hubs">
+            <span>USB ports only</span>
+            <button class="switch switch-sm" role="switch" data-setting="portsOnly" aria-label="Only show devices plugged into USB ports"><span class="knob"></span></button>
+          </label>
         </div>
       </div>
 
@@ -76,12 +83,12 @@
       </form>
     </dialog>
 
-    <dialog id="settings" class="dialog dialog-wide">
+    <dialog id="settings" class="dialog dialog-wide dialog-scroll">
+      <div class="dialog-head dialog-bar">
+        <h2>Settings</h2>
+        <button class="icon-btn" type="button" data-close aria-label="Close settings"><span data-icon="x"></span></button>
+      </div>
       <div class="dialog-body">
-        <div class="dialog-head">
-          <h2>Settings</h2>
-          <button class="icon-btn" type="button" data-close aria-label="Close settings"><span data-icon="x"></span></button>
-        </div>
 
         <section class="settings-group">
           <h3>Appearance</h3>
@@ -97,6 +104,13 @@
 
         <section class="settings-group">
           <h3>Devices</h3>
+          <div class="setting">
+            <div>
+              <span class="setting-title">Only devices on USB ports</span>
+              <span class="setting-desc">Hide parts of the PC that use USB internally, like a built-in webcam, Bluetooth or fingerprint reader.</span>
+            </div>
+            <button class="switch" role="switch" data-setting="portsOnly" aria-label="Only devices on USB ports"><span class="knob"></span></button>
+          </div>
           <div class="setting">
             <div>
               <span class="setting-title">Show disconnected devices</span>

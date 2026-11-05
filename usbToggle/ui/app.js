@@ -59,7 +59,8 @@
     closeToTray: true,
     startMinimized: true,
     showDisconnected: true,
-    showHubs: false,
+    showHubs: true,
+    portsOnly: true,
     confirmRisky: true,
   };
 
@@ -226,6 +227,7 @@
     applyTheme(state.settings.theme);
     $("#banner").hidden = !!info.elevated;
     $("#version").textContent = info.version ? `v${info.version}` : "";
+    syncSettingsDialog();
     const notice = $("#notice");
     notice.hidden = !info.configError;
     notice.textContent = info.configError || "";
@@ -418,7 +420,8 @@
 
     parts.push(categoryLabel(d));
     if (d.vendor && !d.name.toLowerCase().includes(d.vendor.split(" ")[0].toLowerCase())) parts.push(d.vendor);
-    if (d.present) {
+    if (d.builtIn) parts.push(h("span", { class: "built-in-tag", text: "Built-in" }));
+    else if (d.present) {
       if (d.hubName) parts.push(`via ${d.hubName}`);
       else if (d.port) parts.push(`Port ${d.port}`);
     }
@@ -625,12 +628,19 @@
       ...fact("Windows name", d.description && d.description !== d.name ? d.description : null),
       ...fact("Manufacturer", d.vendor),
       ...fact("Hardware ID", vidPid(d), { mono: true }),
-      ...fact("Connected via", d.present ? d.hubName : null),
-      ...fact("Port", d.present && d.port ? String(d.port) : null),
+      ...fact("Connection", connectionText(d)),
       ...fact(d.present ? "Connected since" : "Last seen", seen),
       ...fact("Includes", d.functions && d.functions.length ? d.functions.join(", ") : null),
       ...fact("Instance ID", d.id, { mono: true, copy: true })
     );
+  }
+
+  function connectionText(d) {
+    if (d.builtIn) return "Built into this PC (internal USB)";
+    if (!d.present) return null;
+    const port = d.port ? `port ${d.port}` : null;
+    if (d.hubName) return `USB hub “${d.hubName}”${port ? `, ${port}` : ""}`;
+    return port ? `USB ${port} on this PC` : "USB port on this PC";
   }
 
   function toggleExpanded(id) {
@@ -672,6 +682,21 @@
     return s;
   }
 
+  let hiddenNote = null;
+  function getHiddenNote() {
+    if (!hiddenNote) {
+      const text = h("span");
+      const root = h(
+        "div",
+        { class: "hidden-note" },
+        text,
+        h("button", { class: "link-btn", type: "button", text: "Show them", onclick: () => saveSettings({ portsOnly: false }) })
+      );
+      hiddenNote = { root, text };
+    }
+    return hiddenNote;
+  }
+
   function reconcile(container, nodes) {
     const wanted = new Set(nodes);
     for (const child of Array.from(container.children)) if (!wanted.has(child)) child.remove();
@@ -710,7 +735,10 @@
       el.textContent = "Looking for devices…";
       return;
     }
-    const connected = state.devices.filter((d) => d.present && (state.settings.showHubs || !d.isHub));
+    const s = state.settings;
+    const connected = state.devices.filter(
+      (d) => d.present && (s.showHubs || !d.isHub) && (!s.portsOnly || !d.builtIn || d.pinned)
+    );
     const off = connected.filter((d) => !d.enabled).length;
     const parts = [`${connected.length} connected`];
     if (off) parts.push(`${off} off`);
@@ -729,11 +757,16 @@
 
     const q = state.query.trim().toLowerCase();
     const s = state.settings;
+    const hiddenBuiltIn = [];
     const visible = state.devices.filter((d) => {
       if (!matches(d, q) || !passesFilter(d)) return false;
       if (d.pinned) return true;
       if (d.isHub && !s.showHubs && !q) return false;
       if (!d.present && !s.showDisconnected && d.enabled && !q) return false;
+      if (d.builtIn && s.portsOnly) {
+        hiddenBuiltIn.push(d);
+        return false;
+      }
       return true;
     });
 
@@ -793,8 +826,22 @@
           })
         );
       } else {
-        nodes.push(emptyState("usb", "No USB devices found", "Plug something in. The list updates by itself.", { label: "Refresh", run: refresh }));
+        const text = hiddenBuiltIn.length
+          ? "Nothing is plugged into a USB port right now."
+          : "Plug something in. The list updates by itself.";
+        nodes.push(emptyState("usb", "No USB devices found", text, hiddenBuiltIn.length ? null : { label: "Refresh", run: refresh }));
       }
+    }
+
+    if (hiddenBuiltIn.length) {
+      const present = hiddenBuiltIn.filter((d) => d.present);
+      const names = (present.length ? present : hiddenBuiltIn).slice(0, 3).map((d) => d.name);
+      const more = hiddenBuiltIn.length - names.length;
+      const n = hiddenBuiltIn.length;
+      const note = getHiddenNote();
+      note.text.textContent =
+        `${n} built-in device${n === 1 ? "" : "s"} hidden: ${names.join(", ")}${more > 0 ? ` and ${more} more` : ""}.`;
+      nodes.push(note.root);
     }
 
     reconcile(list, nodes);
@@ -812,6 +859,7 @@
     state.query = q;
     const input = $("#search");
     if (input.value !== q) input.value = q;
+    $("#search-clear").hidden = !q;
     render();
   }
 
@@ -874,6 +922,11 @@
         e.preventDefault();
         setQuery("");
       }
+    });
+
+    $("#search-clear").addEventListener("click", () => {
+      setQuery("");
+      search.focus();
     });
 
     for (const b of $$("#filter button")) b.addEventListener("click", () => setFilter(b.dataset.filter));
