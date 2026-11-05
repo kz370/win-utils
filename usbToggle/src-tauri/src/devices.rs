@@ -51,6 +51,8 @@ pub struct Device {
     pub locked: bool,
     /// Locked by the automatic keyboard/mouse rule rather than by the user.
     pub auto_locked: bool,
+    /// Icon chosen by the user; `None` means the detected category's icon.
+    pub custom_icon: Option<String>,
 }
 
 #[cfg(windows)]
@@ -158,6 +160,7 @@ pub(crate) fn assemble(nodes: Vec<RawNode>) -> Vec<Device> {
             pinned: false,
             locked: false,
             auto_locked: false,
+            custom_icon: None,
         });
     }
     out

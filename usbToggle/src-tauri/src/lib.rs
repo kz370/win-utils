@@ -93,6 +93,7 @@ fn apply_config(devices: &mut [Device], cfg: &Config) {
         let custom = cfg.device(&d.id);
         d.custom_name = custom.and_then(|c| c.name.clone()).filter(|n| !n.trim().is_empty());
         d.pinned = custom.map(|c| c.pinned).unwrap_or(false);
+        d.custom_icon = custom.and_then(|c| c.icon.clone());
         let auto = auto_lock(d, &cfg.settings);
         d.locked = custom.and_then(|c| c.locked).unwrap_or(auto);
         d.auto_locked = d.locked && auto && custom.and_then(|c| c.locked).is_none();
@@ -448,6 +449,28 @@ async fn set_locked(app: AppHandle, id: String, locked: bool) -> Result<Snapshot
     .await?
 }
 
+/// Icon names are short identifiers from ui/icons.js; anything else is refused.
+fn valid_icon_name(name: &str) -> bool {
+    !name.is_empty() && name.len() <= 32 && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+#[tauri::command]
+async fn set_icon(app: AppHandle, id: String, icon: Option<String>) -> Result<Snapshot, String> {
+    let icon = icon.filter(|i| !i.is_empty());
+    if let Some(i) = &icon {
+        if !valid_icon_name(i) {
+            return Err(format!("Unknown icon \"{i}\"."));
+        }
+    }
+    blocking(move || {
+        let core = core(&app);
+        core.config.lock().unwrap().update_device(&id, |d| d.icon = icon);
+        save_config(&core)?;
+        Ok(reapply_config(&app))
+    })
+    .await?
+}
+
 #[tauri::command]
 async fn save_settings(app: AppHandle, settings: Settings) -> Result<Settings, String> {
     blocking(move || {
@@ -546,6 +569,7 @@ pub fn run() {
             rename_device,
             set_pinned,
             set_locked,
+            set_icon,
             save_settings,
             set_autostart,
             restart_as_admin,

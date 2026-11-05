@@ -182,6 +182,25 @@
           </div>
         </section>
       </div>
+      <div class="dialog-footer">
+        <span id="settings-dirty" class="dirty-note" hidden>Unsaved changes</span>
+        <button class="btn" type="button" id="settings-cancel">Cancel</button>
+        <button class="btn btn-primary" type="button" id="settings-save" disabled>Save</button>
+      </div>
+    </dialog>
+
+    <dialog id="unsaved" class="dialog">
+      <form method="dialog" class="dialog-body">
+        <div class="dialog-head">
+          <span class="dialog-icon" data-icon="info"></span>
+          <h2>Save your changes?</h2>
+        </div>
+        <p>You changed some settings. Save them before closing, or discard them to keep things as they were.</p>
+        <div class="dialog-actions">
+          <button value="discard" class="btn" type="submit">Discard</button>
+          <button value="save" class="btn btn-primary" type="submit" id="unsaved-save">Save</button>
+        </div>
+      </form>
     </dialog>
   </body>
 </html>

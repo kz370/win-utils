@@ -39,6 +39,36 @@
   const PANEL_ORDER = ["front", "back", "left", "right", "top", "bottom"];
   const panelLabel = (d) => (d.panel && PANEL[d.panel]) || null;
 
+  // Icons a user can pick for a device. Extra icons borrow a category's color.
+  const ICON_CHOICES = [
+    ["other", "USB"],
+    ["keyboard", "Keyboard"],
+    ["mouse", "Mouse"],
+    ["input", "Keyboard & mouse"],
+    ["gamepad", "Game controller"],
+    ["pen", "Pen tablet"],
+    ["audio", "Headphones"],
+    ["mic", "Microphone"],
+    ["speaker", "Speaker"],
+    ["camera", "Camera"],
+    ["monitor", "Monitor"],
+    ["storage", "Drive"],
+    ["card", "Card reader"],
+    ["phone", "Phone"],
+    ["bluetooth", "Bluetooth"],
+    ["network", "Network"],
+    ["printer", "Printer"],
+    ["serial", "Cable"],
+    ["security", "Security key"],
+    ["light", "Lights"],
+    ["fan", "Fan / cooler"],
+    ["hub", "Hub"],
+  ];
+  const ICON_COLOR = { mic: "audio", speaker: "audio", monitor: "input", pen: "input", card: "storage", light: "gamepad", fan: "network" };
+  const autoIconKey = (d) => (d.category in CATEGORY ? d.category : "other");
+  const iconKey = (d) => (d.customIcon && window.ICONS && window.ICONS[d.customIcon] ? d.customIcon : autoIconKey(d));
+  const colorOf = (key) => ICON_COLOR[key] || key;
+
   const RISKY = new Set(["keyboard", "mouse", "input", "hub", "bluetooth"]);
 
   // Device Manager problem codes, phrased for people.
@@ -250,6 +280,8 @@
     render();
   }
 
+  // Saves settings right away (used outside the Settings dialog, e.g. the
+  // "Show them" notes). Returns true on success.
   async function saveSettings(patch) {
     const before = state.settings;
     state.settings = { ...state.settings, ...patch };
@@ -257,11 +289,13 @@
     syncSettingsDialog();
     try {
       state.settings = await invoke("save_settings", { settings: state.settings });
+      return true;
     } catch (e) {
       state.settings = before;
       render();
       syncSettingsDialog();
       errorToast(String(e));
+      return false;
     }
   }
 
@@ -331,6 +365,14 @@
         store.set("pinHintShown", true);
         toast("Pinned. You can also switch it from the tray icon menu.", { kind: "info", duration: 5000 });
       }
+    } catch (e) {
+      errorToast(String(e));
+    }
+  }
+
+  async function setIcon(id, icon) {
+    try {
+      applySnapshot(await invoke("set_icon", { id, icon }));
     } catch (e) {
       errorToast(String(e));
     }
@@ -522,7 +564,7 @@
       h("div", { class: "device-row" }, refs.main, h("div", { class: "row-actions" }, refs.lock, refs.pin, refs.expand), refs.sw),
       refs.details
     );
-    const row = { root, refs, category: null };
+    const row = { root, refs, iconKey: null };
     rows.set(d.id, row);
     return row;
   }
@@ -537,10 +579,11 @@
     root.classList.toggle("missing", !d.present);
     root.classList.toggle("expanded", expanded);
 
-    if (row.category !== d.category) {
-      row.category = d.category;
-      refs.tile.className = `tile cat-${d.category}`;
-      refs.tile.replaceChildren(iconSpan(d.category in CATEGORY ? d.category : "other"));
+    const key = iconKey(d);
+    if (row.iconKey !== key) {
+      row.iconKey = key;
+      refs.tile.className = `tile cat-${colorOf(key)}`;
+      refs.tile.replaceChildren(iconSpan(key));
     }
     refs.label.textContent = d.name;
     refs.label.title = d.name;
@@ -647,14 +690,18 @@
         save.disabled = typed === (cur?.customName || "") || (!cur?.customName && !typed);
         reset.hidden = !cur?.customName;
       };
+      const picker = h("div", { class: "icon-picker", role: "radiogroup", "aria-label": "Icon" });
       content = h(
         "div",
         { class: "details-content" },
         h("div", { class: "problem-slot" }),
         h("div", { class: "rename" }, input, save, reset),
+        h("p", { class: "picker-label", text: "Icon" }),
+        picker,
         h("dl", { class: "facts" })
       );
       content._rename = { input, syncRenameButtons };
+      content._picker = picker;
       inner.append(content);
     }
 
@@ -662,6 +709,8 @@
     if (document.activeElement !== input) input.value = d.customName || "";
     input.placeholder = d.defaultName;
     syncRenameButtons();
+
+    renderIconPicker(content._picker, d);
 
     const slot = $(".problem-slot", content);
     const problemText = d.present && d.problem && d.problem !== 22 ? PROBLEMS[d.problem] || `Windows reports problem code ${d.problem}.` : null;
@@ -692,6 +741,31 @@
       ...fact("Includes", d.functions && d.functions.length ? d.functions.join(", ") : null),
       ...fact("Instance ID", d.id, { mono: true, copy: true })
     );
+  }
+
+  function renderIconPicker(picker, d) {
+    const auto = autoIconKey(d);
+    const current = d.customIcon && window.ICONS[d.customIcon] ? d.customIcon : null;
+    // Rebuild only when the device's detected type or choice changed.
+    const stamp = `${auto}|${current}`;
+    if (picker.dataset.stamp === stamp) return;
+    picker.dataset.stamp = stamp;
+    const choice = (key, label, isAuto) =>
+      h(
+        "button",
+        {
+          class: "icon-choice cat-" + colorOf(key) + (isAuto ? " auto" : ""),
+          type: "button",
+          role: "radio",
+          title: isAuto ? `Automatic (${CATEGORY[auto] || "USB device"})` : label,
+          "aria-label": isAuto ? "Automatic icon" : label,
+          "aria-pressed": String(isAuto ? !current : current === key),
+          onclick: () => setIcon(d.id, isAuto ? null : key),
+        },
+        iconSpan(key),
+        isAuto ? "Auto" : null
+      );
+    picker.replaceChildren(choice(auto, "Auto", true), ...ICON_CHOICES.map(([key, label]) => choice(key, label, false)));
   }
 
   function protectionText(d) {
@@ -974,45 +1048,92 @@
 
   // ----------------------------------------------------------- settings --
 
+  // The Settings dialog edits a draft; nothing is applied until Save.
+  let draft = null; // { settings, autostart }
+  const savedAutostart = () => !!state.info?.autostart?.enabled;
+
+  function settingsDirty() {
+    if (!draft) return false;
+    const keys = new Set([...Object.keys(draft.settings), ...Object.keys(state.settings)]);
+    for (const k of keys) if (draft.settings[k] !== state.settings[k]) return true;
+    return draft.autostart !== savedAutostart();
+  }
+
   function syncSettingsDialog() {
-    const s = state.settings;
+    const s = draft ? draft.settings : state.settings;
+    const autoOn = draft ? draft.autostart : savedAutostart();
     for (const b of $$("#theme button")) b.setAttribute("aria-checked", String(b.dataset.themeValue === s.theme));
     for (const sw of $$("[data-setting]")) sw.setAttribute("aria-checked", String(!!s[sw.dataset.setting]));
 
     const info = state.info;
-    const auto = info?.autostart || { enabled: false, elevated: false };
-    const autoSw = $("#autostart");
-    autoSw.setAttribute("aria-checked", String(auto.enabled));
+    const saved = info?.autostart || { enabled: false, elevated: false };
+    $("#autostart").setAttribute("aria-checked", String(autoOn));
     let desc;
-    if (auto.enabled && auto.elevated) desc = "Starts with administrator rights, without a UAC prompt.";
-    else if (auto.enabled)
+    if (autoOn && saved.enabled && saved.elevated) desc = "Starts with administrator rights, without a UAC prompt.";
+    else if (autoOn && saved.enabled)
       desc = info?.elevated
-        ? "Starts without administrator rights. Turn this off and on again to start as admin."
+        ? "Starts without administrator rights. Turn this off, save, then on again to start as admin."
         : "Starts without administrator rights.";
+    else if (autoOn)
+      desc = info?.elevated ? "Will start with administrator rights, without a UAC prompt." : "Will start without administrator rights.";
     else if (info?.elevated) desc = "Starts with administrator rights, without a UAC prompt.";
     else desc = "Restart as admin first so it can start with administrator rights.";
     $("#autostart-desc").textContent = desc;
 
     const minSw = $('[data-setting="startMinimized"]');
-    minSw.disabled = !auto.enabled;
-    minSw.closest(".setting").classList.toggle("disabled", !auto.enabled);
+    minSw.disabled = !autoOn;
+    minSw.closest(".setting").classList.toggle("disabled", !autoOn);
+
+    const dirty = settingsDirty();
+    $("#settings-save").disabled = !dirty;
+    $("#settings-dirty").hidden = !dirty;
   }
 
-  async function setAutostart(enabled) {
-    const sw = $("#autostart");
-    sw.setAttribute("aria-busy", "true");
-    sw.setAttribute("aria-checked", String(enabled));
-    try {
-      state.info.autostart = await invoke("set_autostart", { enabled });
-    } catch (e) {
-      errorToast(String(e));
-    } finally {
-      sw.setAttribute("aria-busy", "false");
+  async function saveDraft() {
+    if (!draft) return;
+    const saveBtn = $("#settings-save");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+    const wantAutostart = draft.autostart;
+    let ok = await saveSettings({ ...draft.settings });
+    if (ok && wantAutostart !== savedAutostart()) {
+      try {
+        state.info.autostart = await invoke("set_autostart", { enabled: wantAutostart });
+      } catch (e) {
+        ok = false;
+        errorToast(String(e));
+      }
+    }
+    saveBtn.textContent = "Save";
+    if (ok) {
+      draft = null;
+      $("#settings").close();
+      toast("Settings saved.", { kind: "success", duration: 2500 });
+    } else {
       syncSettingsDialog();
     }
   }
 
+  function discardDraft() {
+    draft = null;
+    applyTheme(state.settings.theme); // undo the theme preview
+    $("#settings").close();
+  }
+
+  // Every way of leaving Settings comes here.
+  function requestCloseSettings() {
+    if (settingsDirty()) {
+      const dlg = $("#unsaved");
+      dlg.returnValue = "";
+      dlg.showModal();
+      $("#unsaved-save").focus();
+    } else {
+      discardDraft();
+    }
+  }
+
   function openSettings() {
+    draft = { settings: { ...state.settings }, autostart: savedAutostart() };
     syncSettingsDialog();
     $("#settings").showModal();
   }
@@ -1042,22 +1163,43 @@
 
     const settings = $("#settings");
     settings.addEventListener("click", (e) => {
-      if (e.target === settings) settings.close(); // backdrop click
+      if (e.target === settings) requestCloseSettings(); // backdrop click
     });
-    $("[data-close]", settings).addEventListener("click", () => settings.close());
+    settings.addEventListener("cancel", (e) => {
+      e.preventDefault(); // Esc: ask first when there are unsaved changes
+      requestCloseSettings();
+    });
+    $("[data-close]", settings).addEventListener("click", requestCloseSettings);
+    $("#settings-cancel").addEventListener("click", requestCloseSettings);
+    $("#settings-save").addEventListener("click", saveDraft);
     for (const b of $$("#theme button"))
       b.addEventListener("click", () => {
-        applyTheme(b.dataset.themeValue);
-        saveSettings({ theme: b.dataset.themeValue });
+        if (!draft) return;
+        draft.settings.theme = b.dataset.themeValue;
+        applyTheme(b.dataset.themeValue); // live preview; reverted on Discard
+        syncSettingsDialog();
       });
     for (const sw of $$("[data-setting]"))
       sw.addEventListener("click", () => {
-        if (sw.disabled) return;
+        if (sw.disabled || !draft) return;
         const key = sw.dataset.setting;
-        saveSettings({ [key]: !state.settings[key] });
+        draft.settings[key] = !draft.settings[key];
+        syncSettingsDialog();
       });
     $("#autostart").addEventListener("click", () => {
-      if (state.info) setAutostart(!state.info.autostart.enabled);
+      if (!draft) return;
+      draft.autostart = !draft.autostart;
+      syncSettingsDialog();
+    });
+
+    const unsaved = $("#unsaved");
+    unsaved.addEventListener("click", (e) => {
+      if (e.target === unsaved) unsaved.close(""); // backdrop: keep editing
+    });
+    unsaved.addEventListener("close", () => {
+      if (unsaved.returnValue === "save") saveDraft();
+      else if (unsaved.returnValue === "discard") discardDraft();
+      // Esc or backdrop: back to Settings, nothing lost.
     });
     for (const b of $$("[data-open-folder]"))
       b.addEventListener("click", () => invoke("open_folder", { which: b.dataset.openFolder }).catch((e) => errorToast(String(e))));
@@ -1080,7 +1222,10 @@
       } else if (e.key === "F5" || (e.ctrlKey && e.key.toLowerCase() === "r")) {
         e.preventDefault(); // never reload the page
         if (!dialogOpen) refresh();
-      } else if (e.ctrlKey && ["p", "s", "u", "g", "j"].includes(e.key.toLowerCase())) {
+      } else if (e.ctrlKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if ($("#settings").open && !$("#unsaved").open && settingsDirty()) saveDraft();
+      } else if (e.ctrlKey && ["p", "u", "g", "j"].includes(e.key.toLowerCase())) {
         e.preventDefault();
       } else if (e.key === "Escape" && !inField && !dialogOpen && state.expanded.size) {
         const ids = Array.from(state.expanded);

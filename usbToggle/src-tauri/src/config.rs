@@ -59,11 +59,15 @@ pub struct DeviceSettings {
     /// (`Settings::protect_input`); `Some` overrides it either way.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locked: Option<bool>,
+    /// Icon chosen by the user (an icon name from ui/icons.js). `None` uses
+    /// the icon of the detected device type.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 impl DeviceSettings {
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && !self.pinned && self.locked.is_none()
+        self.name.is_none() && !self.pinned && self.locked.is_none() && self.icon.is_none()
     }
 }
 
