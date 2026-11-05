@@ -8,7 +8,7 @@ build/
 
 # Rust
 target/
-Cargo.lock
+
 
 # Tauri
 src-tauri/target/
