@@ -275,6 +275,23 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     }
 }
 
+/// The tray uses a tile-less switch glyph, pre-rendered per size so it stays
+/// crisp instead of being scaled down by the shell.
+fn tray_icon(scale: f64) -> Option<tauri::image::Image<'static>> {
+    const ICONS: &[(u32, &[u8])] = &[
+        (16, include_bytes!("../icons/tray/16.png")),
+        (20, include_bytes!("../icons/tray/20.png")),
+        (24, include_bytes!("../icons/tray/24.png")),
+        (32, include_bytes!("../icons/tray/32.png")),
+        (40, include_bytes!("../icons/tray/40.png")),
+        (48, include_bytes!("../icons/tray/48.png")),
+        (64, include_bytes!("../icons/tray/64.png")),
+    ];
+    let want = (16.0 * scale).round() as u32;
+    let (_, bytes) = ICONS.iter().find(|(size, _)| *size >= want).unwrap_or(&ICONS[ICONS.len() - 1]);
+    tauri::image::Image::from_bytes(bytes).ok()
+}
+
 fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.unminimize();
@@ -490,8 +507,9 @@ pub fn run() {
                         toggle_main(tray.app_handle());
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
+            let scale = app.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
+            if let Some(icon) = tray_icon(scale).or_else(|| app.default_window_icon().cloned()) {
+                tray = tray.icon(icon);
             }
             tray.build(app)?;
 

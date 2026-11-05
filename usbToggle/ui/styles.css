@@ -203,13 +203,11 @@ button {
 }
 
 .brand-mark {
-  width: 38px;
-  height: 38px;
-  padding: 8px;
-  border-radius: 11px;
-  background: linear-gradient(140deg, #2b88d8, #0f5fa8);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(15, 95, 168, 0.35);
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.18));
 }
 
 .brand h1 {
