@@ -1,0 +1,158 @@
+USBTOGGLE RELATIONSHIPS
+=======================
+Format: subject | relation | object
+Relations: uses, calls, depends_on, implements, owns, reads, writes, emits, listens_to, invokes,
+           configures, embeds, builds, packages, ships, renders, triggers, stores, returns, wraps.
+Paths are relative to usbToggle/.
+
+# Entry point and core
+main.rs | calls | lib::run
+lib::run | uses | logger::LOGGER
+lib::run | calls | elevation::wait_for_previous_instance
+lib::run | uses | config::Store
+lib::run | calls | elevation::is_elevated
+lib::run | uses | tauri-plugin-single-instance
+lib::run | owns | lib::Core
+lib::run | calls | notify::watch
+lib::run | reads | tauri.conf.json (window definition via app.config())
+lib::run | uses | paths::webview_dir
+lib::Core | owns | config::Store
+lib::Core | owns | config::Config
+lib::Core | owns | devices::Device (list)
+lib::refresh | calls | devices::scan
+lib::refresh | calls | lib::apply_config
+lib::refresh | calls | lib::publish
+lib::reapply_config | calls | lib::publish
+lib::publish | emits | event:devices
+lib::publish | calls | lib::update_tray
+lib::set_busy | emits | event:busy
+lib::toggle_device | calls | control::set_enabled
+lib::toggle_device | calls | lib::set_busy
+lib::toggle_device | calls | lib::refresh
+lib::on_menu_event | calls | lib::toggle_device
+lib::on_menu_event | emits | event:toast
+lib::on_menu_event | calls | lib::refresh
+lib::update_tray | calls | lib::build_tray_menu
+lib::run | calls | lib::tray_icon
+lib::tray_icon | embeds | assets/tray_icon.ico
+lib::tray_icon | calls | ico::pick_frame
+lib::get_info | calls | autostart::state
+lib::get_info | calls | logger::log_dir
+lib::get_devices | calls | lib::refresh
+lib::set_device_enabled | calls | lib::toggle_device
+lib::rename_device | calls | config::Config::update_device
+lib::rename_device | calls | config::Store::save
+lib::set_pinned | calls | config::Config::update_device
+lib::set_pinned | calls | config::Store::save
+lib::set_locked | calls | config::Config::update_device
+lib::set_icon | calls | config::valid_icon
+lib::set_icon | calls | config::Config::update_device
+lib::set_icon | calls | config::Store::save
+lib::save_settings | calls | config::Store::save
+lib::save_settings | calls | lib::apply_theme
+lib::set_autostart | calls | autostart::set
+lib::restart_as_admin | calls | elevation::relaunch_elevated
+lib::open_folder | calls | logger::log_dir
+lib::open_folder | uses | explorer.exe
+
+# Domain modules
+devices::scan | depends_on | devices::imp (Windows)
+devices::imp::scan | calls | devices::assemble
+devices::imp | uses | SetupAPI (setupapi.dll)
+devices::imp | uses | Configuration Manager (cfgmgr32.dll)
+devices::imp | uses | win::wide, win::wide_to_string
+devices::assemble | calls | classify::is_hub
+devices::assemble | calls | classify::categorize
+devices::assemble | calls | classify::display_name
+devices::assemble | calls | classify::function_label
+devices::assemble | calls | classify::parse_vid_pid
+devices::assemble | calls | classify::vendor_name
+devices::assemble | calls | classify::parse_port
+devices::assemble | calls | devices::is_built_in
+devices::assemble | calls | devices::panel_of
+devices::imp::scan | calls | classify::parse_pld_panel
+control::imp | uses | devices::imp::DevInfoSet
+control::imp | uses | devices::imp::registry_dword
+control::imp | uses | devices::imp::devnode_status
+control::imp | uses | SetupAPI (class installer, DIF_PROPERTYCHANGE)
+control::imp | uses | win::wide, win::last_error
+config::Store | depends_on | paths::config_dir
+config::Store | reads | config.json
+config::Store | writes | config.json, config.json.tmp, config.<timestamp>.bak.json
+autostart::imp | uses | win::hidden_command
+autostart::imp | uses | schtasks.exe
+autostart::imp | uses | reg.exe
+autostart::imp | writes | Task Scheduler task "usbToggle"
+autostart::imp | writes | HKCU\Software\Microsoft\Windows\CurrentVersion\Run\usbToggle
+elevation | uses | advapi32 (token elevation)
+elevation | uses | shell32 (ShellExecuteW runas)
+elevation | uses | kernel32 (OpenProcess, WaitForSingleObject)
+notify::register | uses | CM_Register_Notification
+notify::watch | triggers | lib::refresh (via callback closure)
+notify | uses | logger (log_error!)
+logger | depends_on | paths::log_dir
+logger | writes | usbToggle.log, usbToggle.old.log
+paths::portable_dir | reads | portable.txt (existence)
+
+# Front end
+ui/index.html | uses | ui/styles.css
+ui/index.html | uses | ui/icons.js
+ui/index.html | uses | ui/icon-library.js
+ui/index.html | uses | ui/app.js
+ui/index.html | uses | ui/logo.png
+ui/app.js | depends_on | window.__TAURI__ (withGlobalTauri)
+ui/app.js | uses | ui/icons.js (window.icon)
+ui/app.js | uses | ui/icon-library.js (window.ICON_LIBRARY)
+ui/icons.js | uses | ui/icon-library.js (library icons by key "l-<name>")
+ui/app.js | invokes | command:get_info
+ui/app.js | invokes | command:get_devices
+ui/app.js | invokes | command:set_device_enabled
+ui/app.js | invokes | command:rename_device
+ui/app.js | invokes | command:set_pinned
+ui/app.js | invokes | command:set_locked
+ui/app.js | invokes | command:set_icon
+ui/app.js | invokes | command:save_settings
+ui/app.js | invokes | command:set_autostart
+ui/app.js | invokes | command:restart_as_admin
+ui/app.js | invokes | command:ui_ready
+ui/app.js | invokes | command:open_folder
+ui/app.js | invokes | command:quit
+ui/app.js | listens_to | event:devices
+ui/app.js | listens_to | event:busy
+ui/app.js | listens_to | event:toast
+ui/app.js | stores | localStorage (usbToggle.theme, usbToggle.collapsed, usbToggle.pinHintShown)
+ui/app.js | renders | ui/index.html (#list, dialogs, toasts)
+command:* | implements | lib.rs #[tauri::command] functions
+
+# Configuration and build
+src-tauri/build.rs | calls | tauri_build::build
+tauri_build::build | reads | tauri.conf.json
+tauri_build::build | embeds | assets/app_icon.ico (exe resource)
+src-tauri/build.rs | writes | ui/logo.png (copy of assets/header_logo.png)
+tauri.conf.json | configures | frontendDist ../ui (embedded assets)
+tauri.conf.json | configures | main window (created in lib::run)
+capabilities/default.json | configures | permissions of window "main"
+Cargo.toml | depends_on | tauri, tauri-plugin-single-instance, windows-sys, serde, serde_json, chrono, tauri-build
+Cargo.lock | wraps | exact versions for Cargo.toml
+package.json | depends_on | @tauri-apps/cli
+build.bat | uses | @tauri-apps/cli (npx tauri build --no-bundle)
+build.bat | reads | tauri.conf.json (version)
+build.bat | builds | src-tauri/target/release/usbToggle.exe
+build.bat | packages | dist/usbToggle-<version>-portable.zip
+build.bat | ships | installer/portable.txt
+build.bat | calls | ISCC.exe installer/usbToggle.iss
+installer/usbToggle.iss | ships | usbToggle.exe, README.md
+installer/usbToggle.iss | uses | assets/app_icon.ico
+installer/usbToggle.iss | uses | taskkill.exe, schtasks.exe, reg.exe
+installer/usbToggle.iss | reads | WebView2 registration (EdgeUpdate client key)
+
+# Assets
+set-icons.bat | calls | tools/set-icons.ps1
+tools/set-icons.ps1 | uses | npx tauri icon (Tauri CLI, rasterizes PNG and SVG)
+tools/set-icons.ps1 | reads | your PNG/SVG image(s) given on the command line
+tools/set-icons.ps1 | reads | assets/source/app_icon.svg, app_icon_small.svg, tray_icon.svg (with --reset)
+tools/set-icons.ps1 | writes | assets/app_icon.ico, assets/tray_icon.ico, assets/header_logo.png
+tools/build-icon-library.mjs | reads | tools/icon-library.txt
+tools/build-icon-library.mjs | reads | lucide-static (icons, tags, license)
+tools/build-icon-library.mjs | writes | ui/icon-library.js
+package.json | depends_on | lucide-static (dev), @tauri-apps/cli (dev)

@@ -1,0 +1,49 @@
+%% usbToggle - data flow
+flowchart LR
+    subgraph WINDOWS["Windows PnP"]
+        NODES["USB device nodes<br/>(enumerator USB, present and remembered)"]
+        PROPS["Properties<br/>class, names, IDs, config flags,<br/>container, capabilities, location, _PLD"]
+        TREE["Devnode tree<br/>parents and functions"]
+        NOTE["Device-change notifications"]
+    end
+
+    subgraph SCAN["devices::scan"]
+        RAW["RawNode list"]
+        ASM["assemble()<br/>fold interfaces, hubs, built-in,<br/>panel, category, name"]
+    end
+
+    subgraph CORE["lib.rs"]
+        APPLY["apply_config()<br/>custom names, pins,<br/>protection, sort"]
+        STORE_STATE["Core.devices"]
+        SNAP["Snapshot"]
+    end
+
+    subgraph DISK["Disk"]
+        CONFIG["config.json<br/>settings, names, pins, locks"]
+    end
+
+    subgraph VIEWS["Views"]
+        UIWIN["Window (app.js)<br/>filters: ports only, hubs,<br/>disconnected, problems, search<br/>sections: pinned, front, back, ..."]
+        TRAYMENU["Tray menu<br/>pinned devices"]
+    end
+
+    USER(["User"])
+
+    NODES --> RAW
+    PROPS --> RAW
+    TREE --> RAW
+    RAW --> ASM --> APPLY
+    CONFIG --> APPLY
+    APPLY --> STORE_STATE --> SNAP
+    SNAP -- "event: devices" --> UIWIN
+    SNAP -- "rebuild" --> TRAYMENU
+
+    USER -- "switch, rename, pin, settings" --> UIWIN
+    USER -- "check item" --> TRAYMENU
+    UIWIN -- "rename_device / set_pinned / save_settings" --> CONFIG
+    UIWIN -- "set_device_enabled" --> CTL["control::set_enabled<br/>DIF_PROPERTYCHANGE or<br/>CONFIGFLAG_DISABLED"]
+    TRAYMENU -- "toggle_device" --> CTL
+    CTL --> NODES
+    NOTE -- "debounce 350 ms" --> REFRESH["refresh()"]
+    CTL -- "after each operation" --> REFRESH
+    REFRESH --> RAW

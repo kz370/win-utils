@@ -1,37 +1,37 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "usbToggle",
-  "version": "1.0.0",
-  "identifier": "com.usbtoggle.usbToggle",
+  "mainBinaryName": "usbToggle",
+  "version": "0.1.0",
+  "identifier": "com.usbtoggle.app",
   "build": {
-    "frontendDist": "../dist",
-    "beforeDevCommand": "echo done",
-    "beforeBuildCommand": "echo done"
+    "frontendDist": "../ui"
   },
   "app": {
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     },
     "windows": [
       {
-        "title": "usbToggle",
-        "width": 1200,
-        "height": 800,
+        "label": "main",
+        "create": false,
+        "title": "USB Toggle",
+        "width": 620,
+        "height": 760,
+        "minWidth": 440,
+        "minHeight": 520,
+        "center": true,
         "resizable": true,
-        "fullscreen": false,
-        "minWidth": 800,
-        "minHeight": 600
+        "visible": false
       }
-    ],
-    "trayIcon": {
-      "iconPath": "icons/icon.ico"
-    }
+    ]
   },
   "bundle": {
-    "active": true,
-    "targets": "msi",
+    "active": false,
     "icon": [
-      "icons/icon.ico"
-    ]
+      "../assets/app_icon.ico"
+    ],
+    "shortDescription": "Turn USB devices on and off"
   }
 }

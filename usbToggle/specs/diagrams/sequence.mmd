@@ -1,0 +1,53 @@
+%% usbToggle - turning a device off from the window
+sequenceDiagram
+    actor User
+    participant UI as Window (app.js)
+    participant Core as lib.rs (Core)
+    participant Ctl as control.rs
+    participant Dev as devices.rs
+    participant Win as Windows (SetupAPI / CfgMgr32)
+    participant Tray as Tray menu
+
+    User->>UI: Click the switch of a connected device
+    opt device is protected (locked)
+        UI->>User: "Protected. Unprotect it to turn it off." (stop)
+    end
+    alt confirmRisky is on and category is risky
+        UI->>User: "Turn off <name>?" dialog
+        User->>UI: Turn off
+    end
+    UI->>UI: pending[id] = false, spinner on the switch
+    UI->>Core: invoke("set_device_enabled", {id, enabled: false})
+    Core->>Core: refuse with code locked if protected
+    Core->>Core: busy += id
+    Core-->>UI: event "busy" [id]
+    Core->>Core: lock op_lock
+    alt process is not elevated
+        Core->>Core: error accessDenied (Windows not called)
+    else elevated
+        Core->>Ctl: set_enabled(id, false)
+        Ctl->>Win: SetupDiOpenDeviceInfoW(id)
+        Ctl->>Win: SetupDiSetClassInstallParamsW(DICS_DISABLE, DICS_FLAG_GLOBAL)
+        Ctl->>Win: SetupDiCallClassInstaller(DIF_PROPERTYCHANGE)
+        Win-->>Ctl: result (+ DI_NEEDRESTART flag)
+        Ctl-->>Core: Ok(needs_restart) or Err(code, message)
+    end
+    Core->>Core: unlock op_lock, busy -= id
+    Core-->>UI: event "busy" []
+    Core->>Dev: scan()
+    Dev->>Win: enumerate USB nodes and read properties
+    Win-->>Dev: raw nodes
+    Dev-->>Core: Vec<Device>
+    Core->>Core: apply names, pins and protection, store
+    Core-->>UI: event "devices" (Snapshot)
+    Core->>Tray: rebuild menu and tooltip
+    Core->>Core: verify device state (needs restart?)
+    Core-->>UI: ToggleResult {ok, code, message, needsRestart, snapshot}
+    UI->>UI: clear pending, apply snapshot
+    alt ok
+        UI->>User: "Turned off <name>." with Undo
+    else accessDenied
+        UI->>User: error toast with "Restart as admin"
+    else other error
+        UI->>User: error toast with the message
+    end

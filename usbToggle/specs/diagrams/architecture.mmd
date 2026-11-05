@@ -1,0 +1,75 @@
+%% usbToggle - component architecture
+flowchart TB
+    subgraph UI["Window (WebView2) - ui/"]
+        HTML["index.html<br/>structure and dialogs"]
+        APP["app.js<br/>state, rendering, actions"]
+        CSS["styles.css<br/>light and dark themes"]
+        ICONS["icons.js, icon-library.js<br/>SVG icons (22 built-in + 239 Lucide)"]
+    end
+
+    subgraph CORE["Application core - src-tauri/src/lib.rs"]
+        CMDS["IPC commands<br/>get_info, get_devices, set_device_enabled,<br/>rename_device, set_pinned, set_locked,<br/>set_icon, save_settings, set_autostart, restart_as_admin, ui_ready,<br/>open_folder, quit"]
+        STATE["Core state<br/>devices, config, busy set,<br/>scan_lock, op_lock"]
+        EVENTS["Events<br/>devices, busy, toast"]
+        TRAY["Tray icon and menu"]
+        WIN["Main window lifecycle"]
+    end
+
+    subgraph DOMAIN["Domain modules"]
+        DEV["devices.rs<br/>discovery and grouping"]
+        CLS["classify.rs<br/>names, types, panel"]
+        CTL["control.rs<br/>enable / disable"]
+        CFG["config.rs<br/>settings and persistence"]
+        AUTO["autostart.rs<br/>start with Windows"]
+    end
+
+    subgraph PLATFORM["Platform modules"]
+        ELEV["elevation.rs"]
+        NOTIFY["notify.rs"]
+        PATHS["paths.rs"]
+        LOG["logger.rs"]
+        W32["win.rs"]
+    end
+
+    subgraph OS["Windows"]
+        SETUPAPI["SetupAPI<br/>enumeration, class installer"]
+        CFGMGR["CfgMgr32<br/>status, tree, notifications"]
+        SCHED["Task Scheduler / registry<br/>schtasks.exe, reg.exe"]
+        SHELL["Shell and tokens<br/>ShellExecute runas, TokenElevation"]
+        FS["Files<br/>config.json, logs, WebView2 profile"]
+    end
+
+    APP -- "invoke()" --> CMDS
+    EVENTS -- "listen()" --> APP
+    HTML --- APP
+    CSS --- HTML
+    ICONS --- APP
+
+    CMDS --> STATE
+    STATE --> EVENTS
+    STATE --> TRAY
+    WIN --- STATE
+
+    CMDS --> DEV
+    CMDS --> CTL
+    CMDS --> CFG
+    CMDS --> AUTO
+    CMDS --> ELEV
+    TRAY --> CTL
+    DEV --> CLS
+    CTL --> DEV
+
+    NOTIFY -- "debounced refresh" --> STATE
+    CFG --> PATHS
+    LOG --> PATHS
+    WIN --> PATHS
+
+    DEV --> SETUPAPI
+    DEV --> CFGMGR
+    CTL --> SETUPAPI
+    NOTIFY --> CFGMGR
+    AUTO --> SCHED
+    AUTO --> W32
+    ELEV --> SHELL
+    CFG --> FS
+    LOG --> FS

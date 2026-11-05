@@ -1,0 +1,11 @@
+USB Toggle - portable version
+
+Because this file is next to usbToggle.exe, USB Toggle keeps its settings,
+logs and browser data in the "data" folder beside it, and writes nothing
+to %APPDATA%. You can move this folder or keep it on a USB stick.
+
+Delete this file to make USB Toggle use the normal per-user folders instead.
+
+Turning devices on or off needs administrator rights: right-click
+usbToggle.exe > Run as administrator, or use the "Restart as admin" button.
+Requires the Microsoft Edge WebView2 Runtime (included with Windows 10 and 11).

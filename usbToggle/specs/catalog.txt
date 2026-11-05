@@ -1,0 +1,311 @@
+USBTOGGLE CATALOG
+=================
+One-line index of every module, type, function, constant and UI component.
+Format: name [kind] (file) - description. Paths are relative to usbToggle/.
+
+------------------------------------------------------------------------------
+MODULES
+------------------------------------------------------------------------------
+main                [module]  (src-tauri/src/main.rs)        - Binary entry point; calls run().
+lib                 [module]  (src-tauri/src/lib.rs)         - Application core: state, IPC commands, tray, window, startup.
+devices             [module]  (src-tauri/src/devices.rs)     - USB device discovery and grouping into Device records.
+devices::imp        [module]  (src-tauri/src/devices.rs)     - Windows-only SetupAPI/CfgMgr32 code used by the scan.
+classify            [module]  (src-tauri/src/classify.rs)    - Pure naming, categorization and parsing helpers.
+control             [module]  (src-tauri/src/control.rs)     - Enables and disables a device instance.
+control::imp        [module]  (src-tauri/src/control.rs)     - Windows-only class-installer and config-flag code.
+config              [module]  (src-tauri/src/config.rs)      - Settings, per-device names/pins/locks, load/migrate/save.
+autostart           [module]  (src-tauri/src/autostart.rs)   - "Start with Windows" via logon task or Run key.
+autostart::imp      [module]  (src-tauri/src/autostart.rs)   - Windows-only schtasks/reg implementation.
+elevation           [module]  (src-tauri/src/elevation.rs)   - Admin detection, elevated relaunch, wait for old instance.
+notify              [module]  (src-tauri/src/notify.rs)      - Device-change notifications with debouncing.
+paths               [module]  (src-tauri/src/paths.rs)       - Installed vs. portable file locations.
+logger              [module]  (src-tauri/src/logger.rs)      - Rotating file logger and log macros.
+win                 [module]  (src-tauri/src/win.rs)         - UTF-16 helpers, last error, console-less commands.
+ico                 [module]  (src-tauri/src/ico.rs)         - Picks the best frame of a multi-size .ico (tray icon).
+app.js              [module]  (ui/app.js)                    - Front-end state, rendering, interactions and IPC calls.
+icons.js            [module]  (ui/icons.js)                  - Inline SVG icon set (window.ICONS, window.icon).
+icon-library.js     [module]  (ui/icon-library.js)           - Generated Lucide icon library: 239 icons, groups, keywords (window.ICON_LIBRARY).
+
+------------------------------------------------------------------------------
+TYPES (Rust)
+------------------------------------------------------------------------------
+Core                [struct]  (lib.rs)        - Process-wide state: store, config, devices, busy set, locks, elevation.
+Shared              [type]    (lib.rs)        - Arc<Core>, registered as Tauri managed state.
+Snapshot            [struct]  (lib.rs)        - Devices + busy IDs + scan time + scan error; IPC payload and "devices" event.
+AppInfo             [struct]  (lib.rs)        - Version, elevation, settings, autostart, paths, portable flag, config error.
+ToggleResult        [struct]  (lib.rs)        - Outcome of set_device_enabled with the fresh snapshot.
+Device              [struct]  (devices.rs)    - One physical USB device as shown to the user.
+RawNode             [struct]  (devices.rs)    - Raw data read from Windows for one device node.
+DevInfoSet          [struct]  (devices.rs)    - Owns an HDEVINFO handle; destroys it on drop.
+NodeInfo            [struct]  (classify.rs)   - Class, names, service and IDs of a node or function.
+Category            [enum]    (classify.rs)   - Device type: keyboard, mouse, input, gamepad, audio, camera, storage, phone,
+                                                bluetooth, network, printer, serial, security, hub, other.
+ActionError         [struct]  (control.rs)    - Error code + readable message of an enable/disable call.
+ActionOutcome       [struct]  (control.rs)    - Successful enable/disable result (needs_restart).
+Settings            [struct]  (config.rs)     - User settings (theme, tray, startup, display filters incl. hideProblems, protection, confirmation).
+DeviceSettings      [struct]  (config.rs)     - Per-device custom name, pin, lock override and icon.
+Config              [struct]  (config.rs)     - Root of config.json: schema version, settings, device map.
+Store               [struct]  (config.rs)     - Location of config.json; load and save.
+AutostartState      [struct]  (autostart.rs)  - Whether the app starts with Windows and whether elevated.
+Logger              [struct]  (logger.rs)     - Log file path holder with log().
+
+------------------------------------------------------------------------------
+CONSTANTS AND STATICS (Rust)
+------------------------------------------------------------------------------
+TRAY_ID             [const]   (lib.rs)        - "main-tray": ID of the tray icon.
+DEVICE_MENU_PREFIX  [const]   (lib.rs)        - "dev:": prefix of tray menu IDs for pinned devices.
+UI_READY            [static]  (lib.rs)        - Set when the page first calls ui_ready.
+MACHINE_CONTAINER   [const]   (devices.rs)    - "{00000000-0000-0000-ffff-ffffffffffff}": container of the PC itself.
+GENERIC_NAMES       [const]   (classify.rs)   - Windows names that are never used as a display name.
+SKIP_FUNCTIONS      [const]   (classify.rs)   - Function names not listed in the details panel.
+ERROR_NOT_DISABLEABLE / ERROR_NO_SUCH_DEVINST / ERROR_IN_WOW64
+                    [const]   (control.rs)    - SetupAPI error codes mapped to readable errors.
+SCHEMA_VERSION      [const]   (config.rs)     - 3: current config.json schema.
+TASK_NAME           [const]   (autostart.rs)  - "usbToggle": scheduled task name.
+RUN_KEY, RUN_VALUE  [const]   (autostart.rs)  - HKCU Run key path and value name "usbToggle".
+AUTOSTART_ARG       [const]   (autostart.rs)  - "--autostart": argument passed by startup entries.
+SENDER              [static]  (notify.rs)     - Channel sender used by the notification callback.
+PORTABLE_MARKER     [const]   (paths.rs)      - "portable.txt": file that enables portable mode.
+LOGGER              [static]  (logger.rs)     - Global logger instance.
+MAX_SIZE            [const]   (logger.rs)     - 1 MB log rotation threshold.
+
+------------------------------------------------------------------------------
+FUNCTIONS (Rust)
+------------------------------------------------------------------------------
+main                        (main.rs)       - Calls usb_toggle_lib::run().
+run                         (lib.rs)        - Starts the app: logger, config, elevation, Tauri builder, setup, event loop.
+core                        (lib.rs)        - Returns the shared Core from an AppHandle.
+auto_lock                   (lib.rs)        - Automatic protection rule (keyboards and mice when protectInput is on).
+is_locked                   (config.rs)     - Protected = automatic rule or the user's own protection.
+may_unprotect               (config.rs)     - Protection can only be removed while "Protect devices" is off.
+apply_config                (lib.rs)        - Applies custom names, pins, protection and icons, then sorts devices.
+snapshot                    (lib.rs)        - Builds a Snapshot from Core.
+refresh                     (lib.rs)        - Rescans devices, stores the result, publishes it.
+reapply_config              (lib.rs)        - Re-applies names/pins/protection without rescanning, publishes.
+publish                     (lib.rs)        - Emits "devices" and rebuilds the tray menu.
+set_busy                    (lib.rs)        - Adds/removes an ID from the busy set; emits "busy".
+toggle_device               (lib.rs)        - Full enable/disable operation: protection check, elevation check, refresh, verification.
+update_tray                 (lib.rs)        - Replaces the tray menu and tooltip.
+build_tray_menu             (lib.rs)        - Builds the tray menu from a snapshot (pinned devices + commands).
+on_menu_event               (lib.rs)        - Handles tray menu clicks (show, quit, refresh, device toggle).
+tray_icon                   (lib.rs)        - Picks the frame of the built-in assets/tray_icon.ico for a monitor scale factor.
+show_main                   (lib.rs)        - Unminimizes, shows and focuses the main window.
+toggle_main                 (lib.rs)        - Shows or hides the main window (tray left click).
+apply_theme                 (lib.rs)        - Sets the native window theme from the setting.
+blocking                    (lib.rs)        - Runs a closure on the blocking thread pool for async commands.
+save_config                 (lib.rs)        - Saves the current Config through the Store, logging failures.
+get_info                    (lib.rs)        - [command] Returns AppInfo.
+get_devices                 (lib.rs)        - [command] Returns the snapshot, scanning when forced or not yet scanned.
+set_device_enabled          (lib.rs)        - [command] Turns a device on or off; returns ToggleResult.
+rename_device               (lib.rs)        - [command] Sets or clears a custom name.
+set_pinned                  (lib.rs)        - [command] Pins or unpins a device.
+set_locked                  (lib.rs)        - [command] Protects or unprotects a device.
+set_icon                    (lib.rs)        - [command] Sets or clears a device's custom icon (validates the name).
+valid_icon                  (config.rs)     - True for an icon name ([a-z0-9-]{1,32}) or a PNG data URL of at most 48,000 characters.
+save_settings               (lib.rs)        - [command] Saves settings, applies the theme, re-applies device state.
+set_autostart               (lib.rs)        - [command] Turns "Start with Windows" on or off.
+restart_as_admin            (lib.rs)        - [command] Relaunches elevated and exits.
+ui_ready                    (lib.rs)        - [command] Shows the window after the first paint (first call only).
+open_folder                 (lib.rs)        - [command] Opens the config or log folder in Explorer.
+quit                        (lib.rs)        - [command] Exits the app.
+scan                        (devices.rs)    - Returns all USB devices (Windows) or an error (other platforms).
+assemble                    (devices.rs)    - Turns RawNodes into Devices: folding, hubs, built-in, panel, names.
+is_built_in                 (devices.rs)    - Machine-container / removable-capability decision.
+panel_of                    (devices.rs)    - Own or nearest ancestor's panel, stopping at root hubs.
+device_part                 (devices.rs)    - Middle segment of an instance ID (e.g. VID_046D&PID_C52B&MI_00).
+is_interface                (devices.rs)    - True for composite-device interface nodes (&MI_).
+is_root_hub                 (devices.rs)    - True for USB root hubs.
+is_top_level                (devices.rs)    - True for USB device nodes that are neither interfaces nor root hubs.
+vidpid_key                  (devices.rs)    - "VID:PID" key for linking orphaned interfaces.
+imp::open_set               (devices.rs)    - Opens a SetupAPI set for the USB enumerator.
+imp::enum_devices           (devices.rs)    - Lists SP_DEVINFO_DATA entries of a set.
+imp::instance_id            (devices.rs)    - Reads a node's instance ID.
+imp::registry_bytes         (devices.rs)    - Reads a SPDRP_* property as bytes (growing the buffer if needed).
+imp::registry_string        (devices.rs)    - Reads a SPDRP_* string property.
+imp::registry_multi         (devices.rs)    - Reads a SPDRP_* multi-string property.
+imp::registry_dword         (devices.rs)    - Reads a SPDRP_* DWORD property.
+imp::bytes_to_wide          (devices.rs)    - Converts little-endian bytes to UTF-16 units.
+imp::split_multi            (devices.rs)    - Splits a REG_MULTI_SZ buffer.
+imp::property_bytes         (devices.rs)    - Reads a DEVPKEY property with its type.
+imp::property_string        (devices.rs)    - Reads a DEVPKEY string property.
+imp::property_filetime_ms   (devices.rs)    - Reads a DEVPKEY FILETIME as Unix milliseconds.
+imp::devnode_status         (devices.rs)    - Status and problem code of a live devnode.
+imp::cm_device_id           (devices.rs)    - Instance ID of a devnode handle.
+imp::cm_registry            (devices.rs)    - Reads a CM_DRP_* property of a devnode.
+imp::cm_node_info           (devices.rs)    - Builds NodeInfo for a devnode.
+imp::cm_parent              (devices.rs)    - Parent devnode.
+imp::descendants            (devices.rs)    - Collects nodes below a devnode (depth 4, 64 nodes max; not below Bluetooth radios).
+imp::scan                   (devices.rs)    - Windows scan: present set, property reads, tree walks, assemble.
+Category::label             (classify.rs)   - English label of a category.
+is_generic                  (classify.rs)   - True for generic Windows device names.
+ids_upper                   (classify.rs)   - Hardware + compatible IDs in upper case.
+has_usb_class               (classify.rs)   - True when IDs advertise a USB class (CLASS_/DEVCLASS_, not SUBCLASS_).
+is_hub                      (classify.rs)   - True for hub nodes (service or class 09).
+categorize                  (classify.rs)   - Picks the Category from classes, IDs and name hints.
+clean                       (classify.rs)   - Removes " USB Device" and collapses spaces.
+best_of                     (classify.rs)   - First non-generic friendly name or description.
+display_name                (classify.rs)   - Chooses the automatic display name (with vendor prefix rule).
+function_label              (classify.rs)   - Readable function name for the details panel, or None.
+parse_vid_pid               (classify.rs)   - VID and PID from an instance ID.
+parse_pld_panel             (classify.rs)   - Panel (front/back/...) from an ACPI _PLD buffer.
+parse_port                  (classify.rs)   - Port number from "Port_#0003.Hub_#0001".
+vendor_name                 (classify.rs)   - Company name for 81 common USB vendor IDs.
+set_enabled                 (control.rs)    - Enables or disables a device (live or offline).
+ActionError::new            (control.rs)    - Constructor.
+imp::map_error              (control.rs)    - Maps Win32/SetupAPI errors to ActionError.
+imp::call_property_change   (control.rs)    - SetupDiSetClassInstallParamsW + SetupDiCallClassInstaller(DIF_PROPERTYCHANGE).
+imp::change_live            (control.rs)    - Switches a connected device; detects restart requirements.
+imp::change_offline         (control.rs)    - Sets/clears CONFIGFLAG_DISABLED for a disconnected device.
+Config::device              (config.rs)     - Per-device settings by instance ID (case-insensitive).
+Config::update_device       (config.rs)     - Changes per-device settings; removes empty entries.
+DeviceSettings::is_empty    (config.rs)     - True when no name and no pin.
+Store::new                  (config.rs)     - Store at paths::config_dir()/config.json.
+Store::path                 (config.rs)     - Path of config.json.
+Store::load                 (config.rs)     - Loads, migrates, backs up damaged files; returns config + message.
+Store::backup               (config.rs)     - Writes config.<timestamp>.bak.json.
+Store::save                 (config.rs)     - Atomic save via .tmp + rename.
+state                       (autostart.rs)  - Current AutostartState.
+set                         (autostart.rs)  - Enables/disables startup (task when elevated, Run value otherwise).
+imp::task_exists            (autostart.rs)  - schtasks /Query.
+imp::run_value_exists       (autostart.rs)  - reg query.
+imp::xml_escape             (autostart.rs)  - Escapes XML special characters.
+imp::create_task            (autostart.rs)  - Writes the task XML (UTF-16) and runs schtasks /Create.
+imp::delete_task            (autostart.rs)  - schtasks /Delete.
+imp::set_run_value          (autostart.rs)  - reg add / reg delete for the Run value.
+is_elevated                 (elevation.rs)  - True when the process token is elevated.
+relaunch_elevated           (elevation.rs)  - ShellExecuteW "runas" with --wait-for-pid.
+wait_for_previous_instance  (elevation.rs)  - Waits up to 5 s for the PID given by --wait-for-pid.
+watch                       (notify.rs)     - Registers notifications and starts the debounce thread.
+debounce_loop               (notify.rs)     - Waits for quiet (350 ms) or polls (4 s), then calls the handler.
+register                    (notify.rs)     - CM_Register_Notification for all device instances.
+portable_dir                (paths.rs)      - <exe dir>\data when portable.txt exists (cached).
+is_portable                 (paths.rs)      - True in portable mode.
+env_dir                     (paths.rs)      - Folder from an environment variable, or the temp folder.
+config_dir                  (paths.rs)      - Settings folder.
+log_dir                     (paths.rs)      - Log folder.
+webview_dir                 (paths.rs)      - WebView2 profile folder in portable mode.
+Logger::init                (logger.rs)     - Creates the log folder and sets the file path.
+Logger::log                 (logger.rs)     - Appends a line; rotates at 1 MB.
+log_dir                     (logger.rs)     - Delegates to paths::log_dir.
+log_info!, log_error!       (logger.rs)     - [macro] Formats and logs at INFO / ERROR.
+pick_frame                  (ico.rs)        - One-frame .ico with the smallest frame at least `want` px wide (else the largest).
+wide                        (win.rs)        - String to NUL-terminated UTF-16.
+wide_to_string              (win.rs)        - UTF-16 buffer to trimmed String.
+last_error                  (win.rs)        - GetLastError().
+hidden_command              (win.rs)        - std::process::Command with CREATE_NO_WINDOW.
+main [build]               (build.rs)      - Build script: copies assets/header_logo.png to ui/logo.png, then tauri_build::build() (embeds assets/app_icon.ico and version info).
+
+------------------------------------------------------------------------------
+FUNCTIONS AND CONSTANTS (front end, ui/app.js)
+------------------------------------------------------------------------------
+invoke, listen              - Wrappers around window.__TAURI__ core.invoke and event.listen.
+CATEGORY                    - Category labels shown in rows and details.
+PANEL, PANEL_ORDER          - Panel labels and section order.
+panelLabel                  - Label of a device's panel, or null.
+RISKY                       - Categories that need confirmation before turning off.
+PROBLEMS                    - Readable texts for 21 Device Manager problem codes.
+DEFAULT_SETTINGS            - Front-end copy of the setting defaults.
+state                       - Front-end state object.
+store                       - localStorage helper (usbToggle.* keys, errors ignored).
+$, $$                       - querySelector / querySelectorAll helpers.
+h                           - Element builder (attributes, events, children).
+iconSpan                    - Creates a span containing an SVG icon.
+hydrateIcons                - Fills [data-icon] elements in static HTML.
+ago                         - Relative time text ("3 days ago").
+hasProblem                  - Connected device with a problem code other than 22.
+isOn, isBusy                - Effective on/off (with pending overlay) and busy state.
+categoryLabel, vidPid       - Display helpers.
+hubChildren                 - Connected devices whose hubId is the given hub.
+toast, errorToast           - Notifications (with optional action button).
+applySnapshot               - Stores a Snapshot and re-renders.
+applyTheme                  - Sets data-theme and caches the theme.
+applyInfo                   - Stores AppInfo, settings, banner, version, notice.
+saveSettings                - Immediate settings save with rollback (outside the Settings dialog and from Save).
+refresh                     - Forced rescan with spinner.
+setEnabled                  - Switch flow: confirmation, pending, invoke, toasts, Undo.
+setPinned, rename           - Pin and rename actions.
+setLocked                   - Protect / unprotect action; unprotecting is refused while "Protect devices" is on, else asks first.
+askConfirm                  - Reusable warning dialog (title, text, button label, optional "Don't ask again").
+setIcon                     - Sets or clears a device's custom icon.
+uploadIcon                  - Converts a chosen image file and stores it as the device's icon; shows an error toast on failure.
+imageToIcon                 - Validates an image (type, size, dimensions, shape) and returns a small PNG data URL, or throws a message.
+iconNode                    - The icon element: <img> for an uploaded image, else inline SVG.
+isImageIcon                 - True for an uploaded-image icon (PNG data URL).
+UPLOAD, UPLOAD_HINT         - Upload limits (2 MB, 16-4096 px, max 4:1) and the hint text under the upload button.
+restartAsAdmin              - Invokes restart_as_admin.
+copy                        - Copies text to the clipboard.
+confirmDisable              - Confirmation dialog for risky devices.
+rows, sections              - Keyed caches of row and section elements.
+matches, passesFilter       - Search and All/On/Off filter predicates.
+metaParts                   - Secondary line of a row (status, type, vendor, panel, hub/port).
+createRow, updateRow        - Create and update a device row in place.
+fact                        - One label/value pair in the details list.
+renderDetails               - Details panel (rename, icon picker, problem note, facts).
+protectionText              - "Protected automatically" / "Protected by you".
+connectionText              - "USB port 3 on this PC (front panel)" style text.
+toggleExpanded              - Opens/closes a row's details.
+getSection                  - Creates or returns a list section.
+getHiddenNote               - Note about devices hidden by a setting (built-in, not working) with "Show them".
+describeHidden              - Text of a hidden-devices note ("<lead>: A, B, C and 2 more.").
+reconcile                   - Orders children of a container without recreating them.
+skeleton, emptyState        - Loading and empty views.
+renderSummary               - Header summary ("8 connected · 1 off").
+render                      - Builds the grouped, filtered list.
+setFilter, setQuery         - Filter and search state.
+autoIconKey, knownIcon, iconKey, colorOf, iconLabel
+                            - Icon selection helpers: automatic icon, validity, effective icon, color, label.
+iconButton                  - One icon button of the picker.
+renderIconPicker            - Builds the picker (Auto + quick icons + library panel) for a device.
+buildIconLibrary            - Searchable, grouped library panel, built on first open.
+ICON_CHOICES, ICON_COLOR    - Quick-row icons (22) and colors of the extra built-in icons.
+settingsDirty               - True when the Settings draft differs from the saved settings or autostart state.
+syncSettingsDialog          - Synchronizes Settings controls, Save button and "Unsaved changes" with the draft.
+saveDraft                   - Saves the draft (settings, then autostart) and closes Settings on success.
+discardDraft                - Drops the draft, restores the saved theme, closes Settings.
+requestCloseSettings        - Closes Settings, or asks Discard / Save when there are unsaved changes.
+openSettings                - Opens Settings with a draft copy of the current settings.
+bind                        - Wires all event handlers and shortcuts.
+init                        - Startup sequence of the page.
+
+------------------------------------------------------------------------------
+UI COMPONENTS (ui/index.html + ui/styles.css)
+------------------------------------------------------------------------------
+.topbar / .brand            - Header with logo, title and summary.
+#refresh, #open-settings    - Header buttons.
+#banner                     - Administrator banner with "Restart as admin".
+#notice                     - Configuration problem notice.
+.toolbar / .search          - Search field with clear button and Ctrl F hint.
+#filter (.segmented)        - All / On / Off filter.
+#list / .section / .cards   - Device list, sections and card groups.
+.device / .device-row       - One device: tile, name, meta line, pin/details buttons, switch.
+.tile.cat-<category>        - Colored category icon tile.
+.switch                     - On/off switch (role="switch"); spinner while busy; greyed (.frozen) when protected and on.
+.lock-btn / .lock-mark      - Protect button in the row actions and padlock next to the name.
+.details                    - Expandable details panel with rename field and facts.
+.hidden-note                - Notes about hidden built-in and not-working devices.
+.empty / .skeleton          - Empty and loading states.
+#toasts / .toast            - Notifications with optional action.
+#confirm (.dialog)          - Confirmation dialog for risky devices.
+#settings (.dialog-scroll)  - Settings dialog: fixed title bar and footer (Cancel, Save, "Unsaved changes"), scrolling body.
+#unsaved (.dialog)          - "Save your changes?" dialog with Discard and Save.
+.icon-picker                - Icon picker in the details panel (.icon-quick, .icon-library, .icon-search, .icon-grid).
+.setting                    - One settings row (title, description, switch).
+
+------------------------------------------------------------------------------
+BUILD AND DEPLOYMENT COMPONENTS
+------------------------------------------------------------------------------
+build.bat                   - Builds exe, portable folder + ZIP, and the Inno installer into dist\.
+set-icons.bat               - Replaces the icons in assets\ from one or two images (or --reset); runs tools/set-icons.ps1.
+tools/set-icons.ps1         - Builds assets/app_icon.ico, assets/tray_icon.ico and assets/header_logo.png from PNG/SVG images.
+  Say, Test-Image, Invoke-TauriIcon, Write-Ico  [ps1] - Helpers of set-icons.ps1.
+assets/                     - app_icon.ico, tray_icon.ico, header_logo.png, source/*.svg (built-in artwork).
+tools/build-icon-library.mjs - Generates ui/icon-library.js from tools/icon-library.txt and lucide-static.
+tools/icon-library.txt      - The list of library icons and their groups.
+installer/usbToggle.iss     - Inno Setup script (install, WebView2 check, clean uninstall).
+installer/portable.txt      - Portable-mode marker shipped in the ZIP.
+HasWebView2 [iss]           - Checks the WebView2 runtime registration.
+StopApp [iss]               - taskkill of usbToggle.exe before install/uninstall.
+InitializeSetup [iss]       - Offers the WebView2 download when missing.
+PrepareToInstall [iss]      - Stops the running app.
+InitializeUninstall [iss]   - Stops the running app.
+CurUninstallStepChanged [iss] - Offers to delete user settings after uninstall.

@@ -1,9 +1,16 @@
 {
-  "name": "usbToggle",
-  "version": "1.0.0",
-  "description": "USB device toggle tray utility (Tauri)",
+  "name": "usb-toggle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn USB devices on and off from the Windows tray",
   "scripts": {
-    "dev": "echo done",
-    "build": "echo done"
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons:library": "node tools/build-icon-library.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "lucide-static": "1.68.0"
   }
 }
