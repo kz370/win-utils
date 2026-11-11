@@ -2576,7 +2576,10 @@ static const HotkeyBinding kHotkeyBindings[4] = {
 static void SetCheck(HWND h, int id, bool on) { CheckDlgButton(h, id, on ? BST_CHECKED : BST_UNCHECKED); }
 static bool GetCheck(HWND h, int id) { return IsDlgButtonChecked(h, id) == BST_CHECKED; }
 
+static bool g_settingsLoading;  // filling the controls; their change notifications aren't edits
+
 static void SettingsLoad(HWND h) {
+    g_settingsLoading = true;
     for (int i = 0; i < 4; ++i) {
         HWND c = GetDlgItem(h, kHotkeyBindings[i].ctrl);
         WORD w = ToHotkeyWord(g_s.*(kHotkeyBindings[i].field));
@@ -2617,6 +2620,8 @@ static void SettingsLoad(HWND h) {
     SetCheck(h, IDC_DDC, g_s.ddc);
     SetCheck(h, IDC_AUTOSTART, AutostartEnabled());
     SetCheck(h, IDC_EXPLORER_MENU, ExplorerMenuInstalled());
+    g_settingsLoading = false;
+    EnableWindow(GetDlgItem(h, IDC_APPLY), FALSE);  // nothing changed yet
 }
 
 static bool SettingsSave(HWND h) {
@@ -2685,6 +2690,12 @@ static INT_PTR CALLBACK SettingsProc(HWND h, UINT msg, WPARAM wp, LPARAM) {
         case IDC_APPLY:    SettingsSave(h); break;
         case IDCANCEL:     DestroyWindow(h); break;
         case IDC_OPEN_INI: OpenSettingsFile(); break;
+        default: {
+            // Any edit (checkbox, dropdown, number or hotkey box) makes Apply available.
+            const UINT code = HIWORD(wp);
+            if (!g_settingsLoading && (code == BN_CLICKED || code == CBN_SELCHANGE || code == EN_CHANGE))
+                EnableWindow(GetDlgItem(h, IDC_APPLY), TRUE);
+        }
         }
         return TRUE;
     case WM_CLOSE:
