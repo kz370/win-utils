@@ -1,0 +1,114 @@
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+IDI_APP ICON "screenBlank.ico"
+
+1 RT_MANIFEST "screenBlank.manifest"
+
+// ---------------------------------------------------------------------------
+// Screens window: live map of monitors and what each one is doing
+// ---------------------------------------------------------------------------
+IDD_SCREENS DIALOGEX 0, 0, 300, 196
+STYLE DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "screenBlank - Screens"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_MAP, "screenBlank.Map", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 6, 6, 288, 98
+    LTEXT           "", IDC_SEL_LABEL, 6, 108, 288, 9, SS_ENDELLIPSIS
+    PUSHBUTTON      "On", IDC_SEL_ON, 6, 120, 44, 15
+    PUSHBUTTON      "Dim", IDC_SEL_DIM, 52, 120, 44, 15
+    PUSHBUTTON      "Blank", IDC_SEL_BLANK, 98, 120, 44, 15
+    PUSHBUTTON      "Off", IDC_SEL_OFF, 144, 120, 44, 15
+    LTEXT           "Off by", -1, 194, 123, 24, 9
+    COMBOBOX        IDC_OFF_METHOD, 218, 121, 76, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Dim", -1, 6, 143, 18, 9
+    CONTROL         "", IDC_DIM_SLIDER, "msctls_trackbar32", TBS_HORZ | TBS_NOTICKS | TBS_BOTH | WS_TABSTOP, 24, 139, 244, 15
+    LTEXT           "60%", IDC_DIM_VALUE, 270, 143, 24, 9
+    PUSHBUTTON      "Blank all", IDC_ALL_BLANK, 6, 158, 70, 15
+    PUSHBUTTON      "Dim all", IDC_ALL_DIM, 78, 158, 70, 15
+    PUSHBUTTON      "Wake all", IDC_ALL_WAKE, 150, 158, 70, 15
+    PUSHBUTTON      "Identify", IDC_IDENTIFY, 222, 158, 72, 15
+    LTEXT           "", IDC_STATUS, 6, 181, 222, 9, SS_ENDELLIPSIS
+    PUSHBUTTON      "Settings...", IDC_OPEN_SETTINGS, 234, 178, 60, 14
+END
+
+// ---------------------------------------------------------------------------
+// Settings window
+// ---------------------------------------------------------------------------
+IDD_SETTINGS DIALOGEX 0, 0, 400, 300
+STYLE DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "screenBlank - Settings"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Hotkeys", -1, 7, 7, 190, 112
+    LTEXT           "Blank / wake all", -1, 14, 24, 80, 9
+    CONTROL         "", IDC_HK_BLANK, "msctls_hotkey32", WS_BORDER | WS_TABSTOP, 96, 22, 94, 13
+    LTEXT           "Blank all but this one", -1, 14, 44, 80, 9
+    CONTROL         "", IDC_HK_OTHERS, "msctls_hotkey32", WS_BORDER | WS_TABSTOP, 96, 42, 94, 13
+    LTEXT           "Blank this screen", -1, 14, 64, 80, 9
+    CONTROL         "", IDC_HK_CURSOR, "msctls_hotkey32", WS_BORDER | WS_TABSTOP, 96, 62, 94, 13
+    LTEXT           "Dim all", -1, 14, 84, 80, 9
+    CONTROL         "", IDC_HK_DIM, "msctls_hotkey32", WS_BORDER | WS_TABSTOP, 96, 82, 94, 13
+    LTEXT           "Click a box and press keys. Backspace clears it.", -1, 14, 104, 176, 9
+
+    GROUPBOX        "Waking", -1, 203, 7, 190, 112
+    LTEXT           "Wake on", -1, 210, 22, 46, 9
+    COMBOBOX        IDC_WAKE, 258, 20, 128, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Mouse must move (px)", -1, 210, 40, 84, 9
+    EDITTEXT        IDC_THRESHOLD, 296, 38, 40, 13, ES_NUMBER | ES_AUTOHSCROLL
+    AUTOCHECKBOX    "Don't pass the wake key or click to apps", IDC_SWALLOW, 210, 58, 176, 10
+    AUTOCHECKBOX    "Ignore mouse jigglers / synthetic input", IDC_INJECTED, 210, 72, 176, 10
+    AUTOCHECKBOX    "Lock Windows on wake", IDC_LOCK, 210, 86, 176, 10
+
+    GROUPBOX        "Auto-blank", -1, 7, 125, 190, 52
+    LTEXT           "When idle for", -1, 14, 140, 60, 9
+    COMBOBOX        IDC_IDLE, 76, 138, 114, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Not while video or fullscreen apps run", IDC_RESPECT, 14, 158, 176, 10
+
+    GROUPBOX        "Look", -1, 203, 125, 190, 52
+    AUTOCHECKBOX    "Fade in and out", IDC_FADE, 210, 137, 176, 10
+    AUTOCHECKBOX    "Hide mouse cursor on blank screens", IDC_HIDECURSOR, 210, 149, 176, 10
+    AUTOCHECKBOX    "Faint moving clock (burn-in safe)", IDC_CLOCK, 210, 161, 176, 10
+
+    GROUPBOX        "Power", -1, 7, 183, 386, 53
+    AUTOCHECKBOX    "Keep the PC awake while screens are blanked", IDC_AWAKE, 14, 196, 372, 10
+    AUTOCHECKBOX    "Blank all also asks Windows to turn monitors off", IDC_POWEROFF, 14, 209, 372, 10
+    AUTOCHECKBOX    "Put blanked monitors in standby over DDC/CI (only screens that support it)", IDC_DDC, 14, 222, 372, 10
+
+    AUTOCHECKBOX    "Start with Windows", IDC_AUTOSTART, 7, 259, 130, 10
+    AUTOCHECKBOX    "Explorer right-click menu", IDC_EXPLORER_MENU, 7, 272, 130, 10
+    PUSHBUTTON      "Open settings.ini", IDC_OPEN_INI, 150, 279, 70, 14
+    DEFPUSHBUTTON   "OK", IDOK, 233, 279, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 288, 279, 50, 14
+    PUSHBUTTON      "Apply", IDC_APPLY, 343, 279, 50, 14
+END
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     0,1,0,0
+PRODUCTVERSION  0,1,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       0x0L
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "FileDescription", "Make screens look switched off"
+            VALUE "FileVersion",     "0.1.0.0"
+            VALUE "InternalName",    "screenBlank"
+            VALUE "OriginalFilename","screenBlank.exe"
+            VALUE "ProductName",     "screenBlank"
+            VALUE "ProductVersion",  "0.1.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

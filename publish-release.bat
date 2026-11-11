@@ -28,6 +28,7 @@ if exist "f-delete\fdel.exe" copy /y "f-delete\fdel.exe" "release-assets\" >nul
 if exist "restartAwkatSalat\RestartAwqat.exe" copy /y "restartAwkatSalat\RestartAwqat.exe" "release-assets\" >nul
 if exist "SetDefaultApps\SetDefaultApps.exe" copy /y "SetDefaultApps\SetDefaultApps.exe" "release-assets\" >nul
 if exist "SetDefaultApps\UserChoiceLatest.exe" copy /y "SetDefaultApps\UserChoiceLatest.exe" "release-assets\" >nul
+if exist "screenBlank\screenBlank.exe" copy /y "screenBlank\screenBlank.exe" "release-assets\" >nul
 
 rem usbToggle build outputs (installer + portable zip)
 if exist "usbToggle\dist\*.exe" copy /y "usbToggle\dist\*.exe" "release-assets\" >nul
@@ -63,7 +64,7 @@ if errorlevel 1 goto :error
 
 echo.
 echo Creating GitHub release %TAG% (%RELEASE_DATE%)...
-gh release create "%TAG%" --title "Win Utils %RELEASE_DATE%" --notes "Win Utils release dated %RELEASE_DATE%. Bundled apps: cpulimit, fdel, RestartAwqat, SetDefaultApps, usbToggle (0.1.0)." --target main
+gh release create "%TAG%" --title "Win Utils %RELEASE_DATE%" --notes "Win Utils release dated %RELEASE_DATE%. Bundled apps: cpulimit, fdel, RestartAwqat, SetDefaultApps, screenBlank, usbToggle (0.1.0)." --target main
 if errorlevel 1 goto :error
 
 echo.
