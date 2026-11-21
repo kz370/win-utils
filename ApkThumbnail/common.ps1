@@ -1,7 +1,9 @@
 # Shared settings and helpers for install.ps1 / uninstall.ps1.
 
 $Clsid      = '{5E2A7C4B-9D31-4F6A-B8E2-3C7D1A0F9B64}'   # must match the Guid in ApkThumbnail.cs
+$IconClsid  = '{F0AEA457-4A09-494F-8240-E59F6F225285}'   # ApkIconHandler: never takes a stream, see ApkThumbnail.cs
 $ProgId     = 'ApkThumbnail.Provider'
+$IconProgId = 'ApkThumbnail.IconHandler'
 $ThumbIid   = '{e357fccd-a995-4576-b01f-234630154e96}'   # IThumbnailProvider
 $Extensions = '.apk', '.xapk', '.apks', '.apkm'
 $InstallDir = Join-Path $env:ProgramFiles 'ApkThumbnail'
@@ -75,14 +77,82 @@ function Restore-TrackedValues {
     [Microsoft.Win32.Registry]::LocalMachine.DeleteSubKeyTree($StateRoot, $false)
 }
 
-# ProgIDs the extension is currently associated with (system default + the user's choice).
+# ProgIDs the extension is currently associated with (machine default, per-user default, user's choice).
 function Get-ProgIds([string]$Ext) {
     $ids = @()
-    $k = [Microsoft.Win32.Registry]::ClassesRoot.OpenSubKey($Ext)
-    if ($k) { $v = $k.GetValue(''); if ($v) { $ids += [string]$v }; $k.Close() }
+    foreach ($root in [Microsoft.Win32.Registry]::LocalMachine, [Microsoft.Win32.Registry]::CurrentUser) {
+        $k = $root.OpenSubKey("Software\Classes\$Ext")
+        if ($k) { $v = $k.GetValue(''); if ($v) { $ids += [string]$v }; $k.Close() }
+    }
     $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$Ext\UserChoice")
     if ($k) { $v = $k.GetValue('ProgId'); if ($v) { $ids += [string]$v }; $k.Close() }
     $ids | Select-Object -Unique
+}
+
+# ApkShellext2 registers in-process handlers (context menu, info tip, icon, thumbnail) that run inside
+# explorer.exe and keep .apk files open, so Explorer reports them "in use" and they can't be deleted.
+# Unregister it and remove any shell keys that still point at its classes.
+function Remove-ApkShellExt {
+    $found = @{}
+    foreach ($clsidPath in 'Software\Classes\CLSID', 'Software\Classes\WOW6432Node\CLSID') {
+        $clsids = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey($clsidPath)
+        if (-not $clsids) { continue }
+        foreach ($id in $clsids.GetSubKeyNames()) {
+            $k = $clsids.OpenSubKey("$id\InprocServer32")
+            if (-not $k) { continue }
+            $class = [string]$k.GetValue('Class')
+            $codeBase = [string]$k.GetValue('CodeBase')
+            $k.Close()
+            if ($class -match '^ApkShellext') { $found[$id.ToLowerInvariant()] = $codeBase }
+        }
+        $clsids.Close()
+    }
+    if ($found.Count -eq 0) { return }
+    Write-Host 'Removing ApkShellext2 (it keeps .apk files locked inside Explorer)...'
+
+    # its own unregister code removes most of its shell keys
+    foreach ($codeBase in $found.Values | Where-Object { $_ } | Select-Object -Unique) {
+        $dll = try { ([Uri]$codeBase).LocalPath } catch { $null }
+        if (-not $dll -or -not (Test-Path $dll)) { continue }
+        foreach ($fw in $Fw64, $Fw32) {
+            if (Test-Path "$fw\RegAsm.exe") { & "$fw\RegAsm.exe" /nologo /silent /unregister "$dll" | Out-Null }
+        }
+    }
+
+    # leftovers: ShellEx entries (on the extensions and their ProgIDs) that still name its classes
+    $names = @()
+    foreach ($ext in $Extensions) { $names += $ext, "SystemFileAssociations\$ext"; $names += Get-ProgIds $ext }
+    foreach ($root in [Microsoft.Win32.Registry]::LocalMachine, [Microsoft.Win32.Registry]::CurrentUser) {
+        foreach ($name in $names | Select-Object -Unique) {
+            Remove-ShellExRefs $root "Software\Classes\$name\ShellEx" $found.Keys
+        }
+    }
+    foreach ($id in $found.Keys) {
+        foreach ($clsidPath in 'Software\Classes\CLSID', 'Software\Classes\WOW6432Node\CLSID') {
+            [Microsoft.Win32.Registry]::LocalMachine.DeleteSubKeyTree("$clsidPath\$id", $false)
+        }
+        $approved = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved', $true)
+        if ($approved) {
+            foreach ($v in $approved.GetValueNames()) { if ($v.ToLowerInvariant() -eq $id) { $approved.DeleteValue($v, $false) } }
+            $approved.Close()
+        }
+    }
+}
+
+# Deletes every subkey under $Path whose default value is one of $Clsids (lower-case).
+function Remove-ShellExRefs($Root, [string]$Path, $Clsids) {
+    $k = $Root.OpenSubKey($Path)
+    if (-not $k) { return }
+    $subs = $k.GetSubKeyNames()
+    $k.Close()
+    foreach ($s in $subs) {
+        $sub = $Root.OpenSubKey("$Path\$s")
+        if (-not $sub) { continue }
+        $v = ([string]$sub.GetValue('')).ToLowerInvariant()
+        $sub.Close()
+        if ($Clsids -contains $v) { $Root.DeleteSubKeyTree("$Path\$s", $false) }
+        else { Remove-ShellExRefs $Root "$Path\$s" $Clsids }
+    }
 }
 
 # Thumbnail handlers run in dllhost.exe surrogates; kill them so the DLL is not locked.

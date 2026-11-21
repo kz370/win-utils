@@ -31,6 +31,8 @@ To install without restarting Explorer automatically:
 powershell.exe -ExecutionPolicy Bypass -File .\install.ps1 -NoRestart
 ```
 
+The installer also unregisters ApkShellExt2 if it finds it. Its handlers run inside `explorer.exe` and keep `.apk` files open, so Explorer reports them as in use and they can't be deleted. ApkShellExt2 is not restored on uninstall.
+
 If another APK thumbnail or icon handler is installed, uninstall it first if Explorer continues showing blank icons.
 
 ## Uninstall

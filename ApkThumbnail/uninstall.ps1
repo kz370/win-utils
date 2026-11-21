@@ -21,7 +21,12 @@ try {
         }
     }
     # in case the DLL was already gone
-    foreach ($p in "Software\Classes\CLSID\$Clsid", "Software\Classes\WOW6432Node\CLSID\$Clsid", "Software\Classes\$ProgId") {
+    foreach ($id in $Clsid, $IconClsid) {
+        foreach ($p in "Software\Classes\CLSID\$id", "Software\Classes\WOW6432Node\CLSID\$id") {
+            [Microsoft.Win32.Registry]::LocalMachine.DeleteSubKeyTree($p, $false)
+        }
+    }
+    foreach ($p in "Software\Classes\$ProgId", "Software\Classes\$IconProgId") {
         [Microsoft.Win32.Registry]::LocalMachine.DeleteSubKeyTree($p, $false)
     }
 

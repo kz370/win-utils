@@ -47,13 +47,16 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "RegAsm failed ($fw)." }
     }
 
-    # 4. hook the thumbnail handler to the file types
+    # 4. drop ApkShellext2: its in-Explorer handlers keep .apk files open ("file in use")
+    Remove-ApkShellExt
+
+    # 5. hook the thumbnail handler to the file types
     Write-Host 'Registering thumbnail handler for' ($Extensions -join ', ')
     foreach ($ext in $Extensions) {
         Set-TrackedValue HKLM "Software\Classes\$ext\ShellEx\$ThumbIid" '' $Clsid
         Set-TrackedValue HKLM "Software\Classes\SystemFileAssociations\$ext\ShellEx\$ThumbIid" '' $Clsid
-        Set-TrackedValue HKLM "Software\Classes\$ext\ShellEx\IconHandler" '' $Clsid
-        Set-TrackedValue HKLM "Software\Classes\SystemFileAssociations\$ext\ShellEx\IconHandler" '' $Clsid
+        Set-TrackedValue HKLM "Software\Classes\$ext\ShellEx\IconHandler" '' $IconClsid
+        Set-TrackedValue HKLM "Software\Classes\SystemFileAssociations\$ext\ShellEx\IconHandler" '' $IconClsid
         # Explorer only asks the IconHandler when DefaultIcon is "%1" (Details / List / Small icons)
         Set-TrackedValue HKLM "Software\Classes\$ext\DefaultIcon" '' '%1'
         # no small "associated app" badge on top of the icon
@@ -79,7 +82,7 @@ try {
                 $k = $root.OpenSubKey("Software\Classes\$id")
                 if ($k) {
                     $k.Close()
-                    Set-TrackedValue $hive "Software\Classes\$id\ShellEx\IconHandler" '' $Clsid
+                    Set-TrackedValue $hive "Software\Classes\$id\ShellEx\IconHandler" '' $IconClsid
                     # an app's own DefaultIcon (e.g. MuMu's MumuApk.ico) would bypass the IconHandler
                     Set-TrackedValue $hive "Software\Classes\$id\DefaultIcon" '' '%1'
                 }
@@ -87,6 +90,7 @@ try {
         }
     }
     Set-TrackedValue HKLM 'Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved' $Clsid 'APK Thumbnail Provider'
+    Set-TrackedValue HKLM 'Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved' $IconClsid 'APK Icon Handler'
 
     Send-AssocChanged
     if (-not $NoRestart) { Restart-Explorer }

@@ -67,18 +67,22 @@ namespace ApkThumbnail
 
     // Thumbnails (IInitializeWithStream + IThumbnailProvider) cover the big views; Details, List
     // and Small icons ask the IconHandler (IPersistFile + IExtractIcon) for 16/32 px icons instead.
+    //
+    // They are two separate classes on purpose. The shell's stream for a file is a memory-mapped view
+    // of the whole file. If the icon handler also accepted a stream, Explorer would hand it one when it
+    // only wants an icon, and the stream (and the mapping) would live until the next .NET garbage
+    // collection inside explorer.exe - which can be hours - so the file shows as "open in Windows
+    // Explorer" and can't be deleted.
     [ComVisible(true), Guid("5E2A7C4B-9D31-4F6A-B8E2-3C7D1A0F9B64"), ClassInterface(ClassInterfaceType.None), ProgId("ApkThumbnail.Provider")]
-    public sealed class ApkThumbnailProvider : IThumbnailProvider, IInitializeWithStream, IPersistFile, IExtractIconW, IExtractIconA
+    public sealed class ApkThumbnailProvider : IThumbnailProvider, IInitializeWithStream
     {
         const int WTSAT_ARGB = 2;
-        const int S_OK = 0, S_FALSE = 1;
         const int E_FAIL = unchecked((int)0x80004005);
-        const uint GIL_PERINSTANCE = 0x00000002, GIL_NOTFILENAME = 0x00000008;
         IStream stream;
-        string path;
 
         public void Initialize(IStream pstream, uint grfMode)
         {
+            Release(ref stream);
             stream = pstream;
         }
 
@@ -90,15 +94,38 @@ namespace ApkThumbnail
             stream = null;
             if (s == null) throw new COMException("Not initialized", E_FAIL);
 
+            byte[] pixels;
             int size = (int)Math.Min(Math.Max(cx, 16u), 1024u);
-            byte[] pixels = IconRenderer.RenderOnSta(delegate { return new ComStream(s); }, size);
-
-            try { Marshal.ReleaseComObject(s); } catch { }
+            try
+            {
+                pixels = IconRenderer.RenderOnSta(delegate { return new ComStream(s); }, size);
+            }
+            finally
+            {
+                Release(ref s);
+            }
 
             if (pixels == null) throw new COMException("No icon found", E_FAIL);
             phbmp = Native.CreateBitmap(pixels, size, size);
             if (phbmp == IntPtr.Zero) throw new COMException("CreateDIBSection failed", E_FAIL);
         }
+
+        // FinalRelease: drop every reference the RCW holds now, not at the next garbage collection.
+        static void Release(ref IStream s)
+        {
+            if (s == null) return;
+            try { Marshal.FinalReleaseComObject(s); } catch { }
+            s = null;
+        }
+    }
+
+    [ComVisible(true), Guid("F0AEA457-4A09-494F-8240-E59F6F225285"), ClassInterface(ClassInterfaceType.None), ProgId("ApkThumbnail.IconHandler")]
+    public sealed class ApkIconHandler : IPersistFile, IExtractIconW, IExtractIconA
+    {
+        const int S_OK = 0, S_FALSE = 1;
+        const int E_FAIL = unchecked((int)0x80004005);
+        const uint GIL_PERINSTANCE = 0x00000002, GIL_NOTFILENAME = 0x00000008;
+        string path;
 
         // --- IPersistFile: the shell hands the icon handler its file here
 
